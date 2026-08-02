@@ -12,6 +12,8 @@
     "postbuild": "npm run db:push || true"
   },
   "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
     "dotenv": "17.3.1",
     "drizzle-orm": "0.45.2",
     "framer-motion": "^12.43.0",

@@ -17,6 +17,9 @@ import {
   Settings,
   Eye,
   MessageCircle,
+  Percent,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
 import { formatPrice } from "@/lib/currency";
 
@@ -68,7 +71,17 @@ interface Order {
   createdAt: string;
 }
 
-type TabType = "products" | "categories" | "orders" | "requests" | "settings";
+interface DiscountCode {
+  id: number;
+  code: string;
+  discountPercent: number;
+  maxUses: number | null;
+  usedCount: number;
+  active: boolean;
+  createdAt: string;
+}
+
+type TabType = "products" | "categories" | "orders" | "requests" | "discounts" | "settings";
 
 export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -78,7 +91,10 @@ export default function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [discounts, setDiscounts] = useState<DiscountCode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDiscountForm, setShowDiscountForm] = useState(false);
+  const [discountForm, setDiscountForm] = useState({ code: "", percent: "", maxUses: "" });
   
   // Product form
   const [showProductForm, setShowProductForm] = useState(false);
@@ -110,8 +126,8 @@ export default function AdminPage() {
   const [settings, setSettings] = useState({
     storeName: "Momis Wardrobe",
     whatsappLink: "https://chat.whatsapp.com/B9JHotGfxhICVZASVkwUIa",
-    freeShippingThreshold: "15000",
-    shippingRate: "500",
+    freeShippingThreshold: "5000",
+    shippingRate: "250",
   });
 
   useEffect(() => {
@@ -143,21 +159,67 @@ export default function AdminPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [prodsRes, catsRes, reqsRes, ordersRes] = await Promise.all([
+      const [prodsRes, catsRes, reqsRes, ordersRes, discRes] = await Promise.all([
         fetch("/api/products"),
         fetch("/api/categories"),
         fetch("/api/join-requests"),
         fetch("/api/orders/list"),
+        fetch("/api/admin/discounts"),
       ]);
       setProducts(await prodsRes.json());
       setCategories(await catsRes.json());
       if (reqsRes.ok) setRequests(await reqsRes.json());
       if (ordersRes.ok) setOrders(await ordersRes.json());
+      if (discRes.ok) setDiscounts(await discRes.json());
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCreateDiscount = async () => {
+    if (!discountForm.code || !discountForm.percent) {
+      alert("Code aur percentage zaroor bharein!");
+      return;
+    }
+    try {
+      const res = await fetch("/api/admin/discounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: discountForm.code,
+          discountPercent: parseInt(discountForm.percent),
+          maxUses: discountForm.maxUses ? parseInt(discountForm.maxUses) : null,
+        }),
+      });
+      if (res.ok) {
+        alert("Discount code ban gaya!");
+        setShowDiscountForm(false);
+        setDiscountForm({ code: "", percent: "", maxUses: "" });
+        loadData();
+      } else {
+        const err = await res.json();
+        alert(err.error || "Code nahi bana");
+      }
+    } catch {
+      alert("Error aayi");
+    }
+  };
+
+  const handleToggleDiscount = async (id: number, active: boolean) => {
+    await fetch(`/api/admin/discounts/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: !active }),
+    });
+    loadData();
+  };
+
+  const handleDeleteDiscount = async (id: number) => {
+    if (!confirm("Delete karein?")) return;
+    await fetch(`/api/admin/discounts/${id}`, { method: "DELETE" });
+    loadData();
   };
 
   // Product functions
@@ -438,6 +500,7 @@ export default function AdminPage() {
             { key: "categories", label: "Categories", icon: FolderOpen },
             { key: "orders", label: "Orders", icon: ShoppingCart },
             { key: "requests", label: "Join Requests", icon: Users },
+            { key: "discounts", label: "Discounts", icon: Percent },
             { key: "settings", label: "Settings", icon: Settings },
           ].map((tab) => (
             <button
@@ -468,12 +531,29 @@ export default function AdminPage() {
         {/* PRODUCTS TAB */}
         {activeTab === "products" && (
           <>
-            <button
-              onClick={openAddProduct}
-              className="mb-6 flex items-center gap-2 bg-rose-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-rose-600 transition-colors"
-            >
-              <Plus size={18} /> Naya Product
-            </button>
+            <div className="mb-6 flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={openAddProduct}
+                className="flex items-center justify-center gap-2 bg-rose-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-rose-600 transition-colors"
+              >
+                <Plus size={18} /> Naya Product
+              </button>
+              <button
+                onClick={async () => {
+                  const res = await fetch("/api/admin/import-markaz", { method: "POST" });
+                  const data = await res.json();
+                  if (data.success) {
+                    alert(`Women's collection imported! Inserted: ${data.inserted}, Updated: ${data.updated}, Rs. ${data.marginAdded} margin added.`);
+                    loadData();
+                  } else {
+                    alert("Import failed. Dobara try karein.");
+                  }
+                }}
+                className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-rose-500 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:shadow-lg transition-all"
+              >
+                ✨ Import Full Women's Collection
+              </button>
+            </div>
 
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
@@ -557,46 +637,127 @@ export default function AdminPage() {
 
         {/* ORDERS TAB */}
         {activeTab === "orders" && (
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div>
             {orders.length === 0 ? (
-              <div className="text-center py-12">
+              <div className="bg-white rounded-xl shadow-sm text-center py-12">
                 <ShoppingCart className="mx-auto text-warm-gray-200 mb-3" size={40} />
                 <p className="text-warm-gray-400">Abhi tak koi order nahi aaya</p>
               </div>
             ) : (
-              <div className="divide-y divide-warm-gray-100">
-                {orders.map((order) => (
-                  <div key={order.id} className="p-4 sm:p-6">
-                    <div className="flex items-start justify-between gap-4 mb-3">
+              <div className="space-y-4">
+                {orders.map((order: any) => (
+                  <div key={order.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                    {/* Order header */}
+                    <div className="p-4 sm:p-5 flex flex-wrap items-start justify-between gap-3 border-b border-warm-gray-100">
                       <div>
-                        <p className="font-semibold text-warm-gray-900">Order #{order.id}</p>
-                        <p className="text-sm text-warm-gray-500">{order.customerName}</p>
-                        <p className="text-xs text-warm-gray-400">{order.customerEmail}</p>
-                        {order.customerPhone && <p className="text-xs text-warm-gray-400">📞 {order.customerPhone}</p>}
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-mono font-bold text-warm-gray-900">{order.trackingId || `#${order.id}`}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                            order.status === "pending" ? "bg-yellow-100 text-yellow-700" :
+                            order.status === "confirmed" ? "bg-blue-100 text-blue-700" :
+                            order.status === "processing" ? "bg-purple-100 text-purple-700" :
+                            order.status === "shipped" ? "bg-orange-100 text-orange-700" :
+                            order.status === "delivered" ? "bg-green-100 text-green-700" :
+                            order.status === "cancelled" ? "bg-rose-100 text-rose-700" :
+                            "bg-warm-gray-100 text-warm-gray-700"
+                          }`}>
+                            {order.status}
+                          </span>
+                        </div>
+                        <p className="text-sm font-medium text-warm-gray-900">{order.customerName}</p>
+                        {order.customerPhone && <p className="text-xs text-warm-gray-500">📞 {order.customerPhone}</p>}
+                        <p className="text-xs text-warm-gray-400">📍 {order.shippingAddress}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-warm-gray-900">{formatPrice(order.total)}</p>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${order.status === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"}`}>
-                          {order.status}
-                        </span>
+                        <p className="font-bold text-lg text-warm-gray-900">{formatPrice(order.total)}</p>
+                        <p className="text-[10px] text-warm-gray-400">
+                          {new Date(order.createdAt).toLocaleDateString("en-PK", { day: "numeric", month: "short" })}
+                        </p>
                       </div>
                     </div>
-                    <p className="text-xs text-warm-gray-400 mb-2">📍 {order.shippingAddress}</p>
-                    <div className="text-xs text-warm-gray-500">
-                      {order.items.map((item, i) => (
-                        <span key={i}>{item.name} x{item.quantity}{i < order.items.length - 1 ? ", " : ""}</span>
+
+                    {/* Items */}
+                    <div className="px-4 sm:px-5 py-3 text-xs text-warm-gray-500 border-b border-warm-gray-50">
+                      {order.items.map((item: any, i: number) => (
+                        <span key={i}>{item.name} x{item.quantity}{i < order.items.length - 1 ? " • " : ""}</span>
                       ))}
                     </div>
-                    {order.customerPhone && (
-                      <a
-                        href={`https://wa.me/92${order.customerPhone.replace(/^0/, "")}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 mt-3 bg-green-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-600"
+
+                    {/* Actions */}
+                    <div className="p-4 sm:p-5 flex flex-wrap gap-2 items-center">
+                      {/* Status Change */}
+                      <select
+                        value={order.status}
+                        onChange={async (e) => {
+                          await fetch(`/api/admin/orders/${order.id}`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ status: e.target.value }),
+                          });
+                          loadData();
+                        }}
+                        className="text-xs border border-warm-gray-200 rounded-lg px-3 py-2 bg-white"
                       >
-                        <MessageCircle size={12} /> WhatsApp
-                      </a>
-                    )}
+                        <option value="pending">⏳ Pending</option>
+                        <option value="confirmed">✅ Confirmed</option>
+                        <option value="processing">📦 Processing</option>
+                        <option value="shipped">🚚 Shipped</option>
+                        <option value="out_for_delivery">🏃 Out for Delivery</option>
+                        <option value="delivered">✓ Delivered</option>
+                        <option value="cancelled">✕ Cancelled</option>
+                      </select>
+
+                      {/* Courier Info */}
+                      <input
+                        type="text"
+                        placeholder="Courier Name"
+                        defaultValue={order.courierName || ""}
+                        onBlur={async (e) => {
+                          if (e.target.value !== (order.courierName || "")) {
+                            await fetch(`/api/admin/orders/${order.id}`, {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ courierName: e.target.value }),
+                            });
+                            loadData();
+                          }
+                        }}
+                        className="text-xs border border-warm-gray-200 rounded-lg px-3 py-2 w-28"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Tracking #"
+                        defaultValue={order.courierTrackingId || ""}
+                        onBlur={async (e) => {
+                          if (e.target.value !== (order.courierTrackingId || "")) {
+                            await fetch(`/api/admin/orders/${order.id}`, {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                courierTrackingId: e.target.value,
+                                courierName: order.courierName || "TCS",
+                              }),
+                            });
+                            loadData();
+                          }
+                        }}
+                        className="text-xs border border-warm-gray-200 rounded-lg px-3 py-2 w-32"
+                      />
+
+                      {/* WhatsApp notify */}
+                      {order.customerPhone && (
+                        <a
+                          href={`https://wa.me/92${order.customerPhone.replace(/^0/, "")}?text=${encodeURIComponent(
+                            `Assalam o Alaikum ${order.customerName}!\n\nAap ka order ${order.trackingId || "#" + order.id} ka update:\n\n📦 Status: ${order.status.toUpperCase()}\n${order.courierName ? `🚚 Courier: ${order.courierName}` : ""}\n${order.courierTrackingId ? `📋 Tracking: ${order.courierTrackingId}` : ""}\n\nTrack karein: momis-wardrobe-vert.vercel.app/track\n\nShukriya!\nMomis Wardrobe 💕`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 bg-green-500 text-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-green-600"
+                        >
+                          <MessageCircle size={12} /> Notify
+                        </a>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -637,6 +798,106 @@ export default function AdminPage() {
               </div>
             )}
           </div>
+        )}
+
+        {/* DISCOUNTS TAB */}
+        {activeTab === "discounts" && (
+          <>
+            <button
+              onClick={() => setShowDiscountForm(true)}
+              className="mb-6 flex items-center gap-2 bg-rose-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-rose-600"
+            >
+              <Plus size={18} /> Naya Discount Code
+            </button>
+
+            {showDiscountForm && (
+              <div className="bg-white rounded-xl shadow-sm p-6 mb-6 max-w-md">
+                <h3 className="font-semibold text-warm-gray-900 mb-4">Naya Code Banayein</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-warm-gray-600 mb-1">Code *</label>
+                    <input
+                      type="text"
+                      value={discountForm.code}
+                      onChange={(e) => setDiscountForm({ ...discountForm, code: e.target.value.toUpperCase() })}
+                      placeholder="e.g., MOMIS20"
+                      className="w-full border border-warm-gray-200 rounded-lg px-4 py-2.5 uppercase focus:outline-none focus:ring-2 focus:ring-rose-200"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-warm-gray-600 mb-1">Discount % *</label>
+                      <input
+                        type="number"
+                        value={discountForm.percent}
+                        onChange={(e) => setDiscountForm({ ...discountForm, percent: e.target.value })}
+                        placeholder="e.g., 15"
+                        min="1"
+                        max="100"
+                        className="w-full border border-warm-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-warm-gray-600 mb-1">Max Uses (optional)</label>
+                      <input
+                        type="number"
+                        value={discountForm.maxUses}
+                        onChange={(e) => setDiscountForm({ ...discountForm, maxUses: e.target.value })}
+                        placeholder="Unlimited"
+                        className="w-full border border-warm-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button onClick={handleCreateDiscount} className="flex-1 bg-rose-500 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-rose-600">Create</button>
+                    <button onClick={() => setShowDiscountForm(false)} className="px-4 py-2.5 border border-warm-gray-200 rounded-lg text-sm text-warm-gray-600">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              {discounts.length === 0 ? (
+                <div className="text-center py-12">
+                  <Percent className="mx-auto text-warm-gray-200 mb-3" size={40} />
+                  <p className="text-warm-gray-400">Koi discount code nahi hai</p>
+                  <p className="text-xs text-warm-gray-300 mt-1">Upar button se banayein</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-warm-gray-100">
+                  {discounts.map((d) => (
+                    <div key={d.id} className="p-4 flex items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-warm-gray-900 bg-warm-gray-100 px-2 py-0.5 rounded">{d.code}</span>
+                          <span className="text-sm text-rose-500 font-semibold">{d.discountPercent}% OFF</span>
+                          {!d.active && <span className="text-xs bg-warm-gray-200 text-warm-gray-500 px-2 py-0.5 rounded">Inactive</span>}
+                        </div>
+                        <p className="text-xs text-warm-gray-400 mt-1">
+                          Used: {d.usedCount}{d.maxUses ? ` / ${d.maxUses}` : " (unlimited)"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleToggleDiscount(d.id, d.active)}
+                          className={`p-2 rounded-lg ${d.active ? "text-green-500 hover:bg-green-50" : "text-warm-gray-400 hover:bg-warm-gray-50"}`}
+                          title={d.active ? "Deactivate" : "Activate"}
+                        >
+                          {d.active ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteDiscount(d.id)}
+                          className="p-2 text-warm-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         {/* SETTINGS TAB */}

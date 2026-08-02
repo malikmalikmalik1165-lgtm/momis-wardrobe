@@ -117,7 +117,7 @@ export default async function HomePage() {
               {
                 icon: <Truck size={20} />,
                 title: "Free Shipping",
-                desc: "On orders over Rs. 15,000",
+                desc: "On orders over Rs. 5,000",
               },
               {
                 icon: <RotateCcw size={20} />,

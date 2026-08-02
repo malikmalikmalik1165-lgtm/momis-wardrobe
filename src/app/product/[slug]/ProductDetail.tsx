@@ -323,18 +323,25 @@ export default function ProductDetail({ product, related }: Props) {
                 </button>
               </div>
 
-              {/* WhatsApp */}
+              {/* WhatsApp Order */}
               <a
-                href="https://chat.whatsapp.com/B9JHotGfxhICVZASVkwUIa"
+                href={`https://wa.me/923295578925?text=${encodeURIComponent(
+                  `Assalam o Alaikum! Mujhe ye product order karna hai:\n\n*${product.name}*\nPrice: Rs. ${parseFloat(product.price).toLocaleString()}\n${selectedSize ? `Size: ${selectedSize}` : ""}\n${selectedColor ? `Color: ${selectedColor}` : ""}\n\nPlease confirm availability.`
+                )}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 px-4 py-3 rounded-lg text-sm transition-colors"
+                className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-3.5 rounded-lg text-sm font-semibold transition-colors"
               >
                 <MessageCircle size={18} />
-                <span>
-                  Ask about this product on our{" "}
-                  <span className="font-semibold">WhatsApp Community</span>
-                </span>
+                WhatsApp Se Order Karein
+              </a>
+
+              {/* Call to Order */}
+              <a
+                href="tel:03295578925"
+                className="flex items-center justify-center gap-2 border-2 border-warm-gray-200 hover:border-warm-gray-300 text-warm-gray-700 px-4 py-3 rounded-lg text-sm transition-colors"
+              >
+                📞 Call: 03295578925
               </a>
 
               {/* Trust badges */}
@@ -342,7 +349,7 @@ export default function ProductDetail({ product, related }: Props) {
                 <div className="text-center">
                   <Truck size={18} className="mx-auto text-warm-gray-400 mb-1" />
                   <p className="text-[10px] text-warm-gray-500">
-                    Free Shipping 15K+
+                    Free Delivery 5K+
                   </p>
                 </div>
                 <div className="text-center">
@@ -421,7 +428,7 @@ export default function ProductDetail({ product, related }: Props) {
                     Shipping & Returns
                   </h3>
                   <ul className="text-sm text-warm-gray-500 space-y-1.5">
-                    <li>• Free standard shipping on orders over Rs. 15,000</li>
+                    <li>• Free delivery on orders over Rs. 5,000</li>
                     <li>• Express delivery available</li>
                     <li>• 30-day hassle-free returns</li>
                     <li>• Full refund or exchange</li>

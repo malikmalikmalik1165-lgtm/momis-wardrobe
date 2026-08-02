@@ -1,16 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import CartDrawer from "@/components/CartDrawer";
-import WhatsAppFloat from "@/components/WhatsAppFloat";
-import InstallPrompt from "@/components/InstallPrompt";
+import LayoutShell from "@/components/LayoutShell";
 
 export const metadata: Metadata = {
   title: "Momis Wardrobe — Elegant Women's Fashion",
   description:
-    "Discover curated women's fashion at Momis Wardrobe. Shop elegant dresses, luxury bags, designer shoes, and premium tops. Free shipping on orders over Rs. 15,000.",
+    "Discover curated women's fashion at Momis Wardrobe. Shop elegant dresses, luxury bags, designer shoes, and premium tops. Free delivery on orders over Rs. 5,000." ,
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -32,8 +28,8 @@ export const viewport: Viewport = {
   themeColor: "#f43f5e",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -50,7 +46,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap"
           rel="stylesheet"
         />
-        {/* PWA / App Icons */}
         <link rel="icon" href="/icons/icon-192.png" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -62,12 +57,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         className="bg-cream text-warm-gray-900 antialiased"
         style={{ fontFamily: "'Inter', sans-serif" }}
       >
-        <Header />
-        <CartDrawer />
-        <main>{children}</main>
-        <Footer />
-        <WhatsAppFloat />
-        <InstallPrompt />
+        <LayoutShell>{children}</LayoutShell>
       </body>
     </html>
   );
