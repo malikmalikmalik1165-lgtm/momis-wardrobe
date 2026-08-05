@@ -11,7 +11,7 @@ interface ReferralOrder { trackingId: string; total: string; status: string; cre
 export default function TeamPage() {
   const [member, setMember] = useState<Member | null>(null);
   const [referralOrders, setReferralOrders] = useState<ReferralOrder[]>([]);
-  const [tab, setTab] = useState<"dashboard" | "guide" | "share">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "guide" | "share" | "rewards">("dashboard");
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -141,6 +141,7 @@ export default function TeamPage() {
             { key: "dashboard", label: "Dashboard", icon: TrendingUp },
             { key: "guide", label: "Guide", icon: BookOpen },
             { key: "share", label: "Share & Earn", icon: Share2 },
+            { key: "rewards", label: "Rewards 🏆", icon: Gift },
           ].map((t) => (
             <button key={t.key} onClick={() => setTab(t.key as typeof tab)}
               className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap ${tab === t.key ? "bg-purple-600 text-white" : "bg-white text-warm-gray-600"}`}>
@@ -259,6 +260,133 @@ export default function TeamPage() {
               <Link href="/shop" className="flex items-center justify-center gap-2 bg-rose-500 text-white py-3 rounded-lg font-medium hover:bg-rose-600">
                 <ShoppingBag size={16} /> Products Dekhen & Share Karein
               </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Rewards Tab */}
+        {tab === "rewards" && (
+          <div className="space-y-6">
+            {/* Current Level */}
+            <div className="bg-gradient-to-br from-purple-600 via-rose-500 to-pink-500 rounded-2xl p-6 text-white">
+              <div className="text-center">
+                <p className="text-white/70 text-xs uppercase tracking-widest mb-2">Aap Ka Level</p>
+                <div className="text-5xl mb-2">
+                  {member.totalSales >= 50 ? "💎" : member.totalSales >= 25 ? "🥇" : member.totalSales >= 10 ? "🥈" : member.totalSales >= 3 ? "🥉" : "⭐"}
+                </div>
+                <h2 className="text-2xl font-bold">
+                  {member.totalSales >= 50 ? "Diamond Seller" : member.totalSales >= 25 ? "Gold Seller" : member.totalSales >= 10 ? "Silver Seller" : member.totalSales >= 3 ? "Bronze Seller" : "Starter"}
+                </h2>
+                <p className="text-white/70 text-sm mt-1">{member.totalSales} Sales Completed</p>
+                {member.totalSales < 50 && (
+                  <div className="mt-4">
+                    <div className="bg-white/20 rounded-full h-3 w-full max-w-xs mx-auto">
+                      <div className="bg-white rounded-full h-3 transition-all"
+                        style={{ width: `${Math.min(100, (member.totalSales / (member.totalSales >= 25 ? 50 : member.totalSales >= 10 ? 25 : member.totalSales >= 3 ? 10 : 3)) * 100)}%` }} />
+                    </div>
+                    <p className="text-white/60 text-[10px] mt-2">
+                      Next level: {member.totalSales >= 25 ? "50 sales → Diamond 💎" : member.totalSales >= 10 ? "25 sales → Gold 🥇" : member.totalSales >= 3 ? "10 sales → Silver 🥈" : "3 sales → Bronze 🥉"}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Rewards Tiers */}
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3 bg-warm-gray-50 border-b border-warm-gray-100">
+                <h3 className="text-sm font-bold text-warm-gray-900">🏆 Rewards & Milestones</h3>
+              </div>
+              <div className="divide-y divide-warm-gray-50">
+                {[
+                  { sales: 3, level: "🥉 Bronze", reward: "Welcome Bonus Rs. 500", commission: "10%", achieved: member.totalSales >= 3 },
+                  { sales: 10, level: "🥈 Silver", reward: "Rs. 2,000 Bonus + Free Product", commission: "12%", achieved: member.totalSales >= 10 },
+                  { sales: 25, level: "🥇 Gold", reward: "Rs. 5,000 Bonus + Certificate", commission: "15%", achieved: member.totalSales >= 25 },
+                  { sales: 50, level: "💎 Diamond", reward: "Rs. 15,000 Bonus + Gift Hamper + Certificate", commission: "18%", achieved: member.totalSales >= 50 },
+                  { sales: 100, level: "👑 Royal", reward: "Rs. 50,000 Bonus + Gold Certificate + Exclusive Perks", commission: "20%", achieved: member.totalSales >= 100 },
+                ].map((tier) => (
+                  <div key={tier.sales} className={`px-5 py-4 flex items-center gap-4 ${tier.achieved ? "bg-green-50/50" : ""}`}>
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${
+                      tier.achieved ? "bg-green-100" : "bg-warm-gray-100"
+                    }`}>
+                      {tier.achieved ? "✅" : tier.level.split(" ")[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className={`font-semibold text-sm ${tier.achieved ? "text-green-700" : "text-warm-gray-900"}`}>
+                          {tier.level}
+                        </p>
+                        <span className="text-[10px] text-warm-gray-400">{tier.sales} Sales</span>
+                      </div>
+                      <p className="text-xs text-warm-gray-500 mt-0.5">{tier.reward}</p>
+                      <p className="text-[10px] text-purple-500 font-medium mt-0.5">Commission: {tier.commission}</p>
+                    </div>
+                    {tier.achieved && (
+                      <span className="text-green-600 text-xs font-bold bg-green-100 px-2 py-1 rounded-full flex-shrink-0">Achieved ✓</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Monthly Bonus */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-bold text-warm-gray-900 mb-4 flex items-center gap-2">
+                🎁 Monthly Bonuses
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-amber-50 rounded-xl p-4 text-center border border-amber-100">
+                  <p className="text-2xl mb-1">🏅</p>
+                  <p className="font-bold text-warm-gray-900 text-sm">Top Seller</p>
+                  <p className="text-xs text-warm-gray-500 mt-1">Month ka #1 seller</p>
+                  <p className="text-rose-500 font-bold text-sm mt-2">Rs. 10,000 Bonus</p>
+                </div>
+                <div className="bg-blue-50 rounded-xl p-4 text-center border border-blue-100">
+                  <p className="text-2xl mb-1">📈</p>
+                  <p className="font-bold text-warm-gray-900 text-sm">Rising Star</p>
+                  <p className="text-xs text-warm-gray-500 mt-1">Sabse zyada growth</p>
+                  <p className="text-rose-500 font-bold text-sm mt-2">Rs. 5,000 Bonus</p>
+                </div>
+                <div className="bg-purple-50 rounded-xl p-4 text-center border border-purple-100">
+                  <p className="text-2xl mb-1">🤝</p>
+                  <p className="font-bold text-warm-gray-900 text-sm">Team Builder</p>
+                  <p className="text-xs text-warm-gray-500 mt-1">5+ new referrals</p>
+                  <p className="text-rose-500 font-bold text-sm mt-2">Rs. 3,000 Bonus</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Certificate Info */}
+            <div className="bg-gradient-to-br from-warm-gray-900 to-warm-gray-800 rounded-2xl p-6 text-white">
+              <h3 className="font-bold mb-3 flex items-center gap-2">📜 Certificates</h3>
+              <ul className="space-y-2 text-sm text-warm-gray-300">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-400">✓</span>
+                  <span><strong className="text-white">Bronze Certificate</strong> — 3 sales complete karne par digital certificate milega</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-400">✓</span>
+                  <span><strong className="text-white">Gold Certificate</strong> — 25 sales par official printed certificate + stamp</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-400">✓</span>
+                  <span><strong className="text-white">Diamond Certificate</strong> — 50 sales par framed certificate + gift hamper courier hogi</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-400">✓</span>
+                  <span><strong className="text-white">Royal Recognition</strong> — 100 sales par gold certificate + feature on website + VIP support</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Claim Help */}
+            <div className="bg-green-50 rounded-xl p-5 text-center">
+              <p className="text-sm text-warm-gray-700 mb-3">Bonus ya certificate claim karna hai?</p>
+              <a href={`https://wa.me/923295578925?text=Assalam%20o%20Alaikum!%20Main%20${encodeURIComponent(member.name)}%20hoon%20(Code:%20${member.referralCode}).%20Meri%20${member.totalSales}%20sales%20hain.%20Mujhe%20apna%20reward%20claim%20karna%20hai.`}
+                target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-green-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-green-600 transition-colors">
+                <MessageCircle size={16} /> WhatsApp Par Claim Karein
+              </a>
             </div>
           </div>
         )}

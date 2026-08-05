@@ -9,6 +9,7 @@ import InstallPrompt from "@/components/InstallPrompt";
 import MobileNav from "@/components/MobileNav";
 import { ToastContainer } from "@/components/Toast";
 import AlertInterceptor from "@/components/AlertInterceptor";
+import AiChat from "@/components/AiChat";
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -33,6 +34,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
       <Footer />
       <MobileNav />
       <WhatsAppFloat />
+      <AiChat />
       <InstallPrompt />
       <ToastContainer />
     </>

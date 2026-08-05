@@ -31,6 +31,8 @@ export default function CheckoutPage() {
   const [couponApplied, setCouponApplied] = useState<{ code: string; discountPercent: number } | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState("");
+  const [referralCode, setReferralCode] = useState("");
+  const [referralValid, setReferralValid] = useState<boolean | null>(null);
 
   const [form, setForm] = useState({
     firstName: "",
@@ -206,6 +208,7 @@ export default function CheckoutPage() {
           customerEmail: form.email || `${form.phone}@order.local`,
           customerPhone: form.phone,
           shippingAddress: `${form.address}, ${form.area}, ${form.city}`,
+          referralCode: referralValid ? referralCode.trim() : null,
           paymentMethod,
           items: items.map((item) => ({
             productId: item.productId,
@@ -495,6 +498,44 @@ export default function CheckoutPage() {
                     </span>
                   </div>
                 ))}
+              </div>
+
+              {/* Referral Code */}
+              <div className="mb-4">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={referralCode}
+                    onChange={(e) => { setReferralCode(e.target.value.toUpperCase()); setReferralValid(null); }}
+                    placeholder="👥 Team Referral Code (optional)"
+                    className={`flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 uppercase ${
+                      referralValid === true ? "border-green-300 bg-green-50" :
+                      referralValid === false ? "border-rose-300 bg-rose-50" :
+                      "border-warm-gray-200"
+                    }`}
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!referralCode.trim()) return;
+                      const res = await fetch("/api/auth/team/verify-code", {
+                        method: "POST", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ code: referralCode }),
+                      });
+                      const data = await res.json();
+                      setReferralValid(data.valid);
+                    }}
+                    disabled={!referralCode.trim()}
+                    className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-40 whitespace-nowrap"
+                  >
+                    Check
+                  </button>
+                </div>
+                {referralValid === true && (
+                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">✅ Valid referral code!</p>
+                )}
+                {referralValid === false && (
+                  <p className="text-xs text-rose-500 mt-1">❌ Invalid code. Check karein.</p>
+                )}
               </div>
 
               {/* Coupon Code */}
