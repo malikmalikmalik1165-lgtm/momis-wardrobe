@@ -66,6 +66,22 @@ export const joinRequests = pgTable("join_requests", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  endpoint: text("endpoint").notNull().unique(),
+  keys: json("keys").$type<{ p256dh: string; auth: string }>().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  url: text("url"),
+  sentCount: integer("sent_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const otpCodes = pgTable("otp_codes", {
   id: serial("id").primaryKey(),
   phone: text("phone").notNull(),

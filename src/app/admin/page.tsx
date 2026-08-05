@@ -81,7 +81,7 @@ interface DiscountCode {
   createdAt: string;
 }
 
-type TabType = "products" | "categories" | "orders" | "requests" | "discounts" | "settings";
+type TabType = "products" | "categories" | "orders" | "requests" | "discounts" | "notifications" | "settings";
 
 export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -95,6 +95,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
   const [discountForm, setDiscountForm] = useState({ code: "", percent: "", maxUses: "" });
+  const [notifList, setNotifList] = useState<{ id: number; title: string; body: string; url: string | null; createdAt: string }[]>([]);
+  const [notifForm, setNotifForm] = useState({ title: "", body: "", url: "" });
+  const [quickProduct, setQuickProduct] = useState({ name: "", price: "", image: "", category: "", description: "" });
   
   // Product form
   const [showProductForm, setShowProductForm] = useState(false);
@@ -171,11 +174,51 @@ export default function AdminPage() {
       if (reqsRes.ok) setRequests(await reqsRes.json());
       if (ordersRes.ok) setOrders(await ordersRes.json());
       if (discRes.ok) setDiscounts(await discRes.json());
+      // Load notifications
+      const notifRes = await fetch("/api/admin/notifications");
+      if (notifRes.ok) setNotifList(await notifRes.json());
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSendNotification = async () => {
+    if (!notifForm.title || !notifForm.body) { alert("Title aur message likhein"); return; }
+    try {
+      const res = await fetch("/api/admin/notifications", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(notifForm),
+      });
+      if (res.ok) {
+        alert("Notification bhej di gayi sab users ko!");
+        setNotifForm({ title: "", body: "", url: "" });
+        loadData();
+      }
+    } catch { alert("Failed"); }
+  };
+
+  const handleQuickAddProduct = async () => {
+    if (!quickProduct.name || !quickProduct.price) { alert("Name aur price zaroor dein"); return; }
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: quickProduct.name,
+          price: quickProduct.price,
+          description: quickProduct.description || quickProduct.name,
+          images: quickProduct.image ? [quickProduct.image] : [],
+          categoryId: quickProduct.category ? parseInt(quickProduct.category) : null,
+          sizes: [], colors: [], featured: true, inStock: true,
+        }),
+      });
+      if (res.ok) {
+        alert("Product add ho gaya!");
+        setQuickProduct({ name: "", price: "", image: "", category: "", description: "" });
+        loadData();
+      }
+    } catch { alert("Failed"); }
   };
 
   const handleCreateDiscount = async () => {
@@ -501,6 +544,7 @@ export default function AdminPage() {
             { key: "orders", label: "Orders", icon: ShoppingCart },
             { key: "requests", label: "Join Requests", icon: Users },
             { key: "discounts", label: "Discounts", icon: Percent },
+            { key: "notifications", label: "Notifications", icon: MessageCircle },
             { key: "settings", label: "Settings", icon: Settings },
           ].map((tab) => (
             <button
@@ -531,6 +575,32 @@ export default function AdminPage() {
         {/* PRODUCTS TAB */}
         {activeTab === "products" && (
           <>
+            {/* ⚡ Quick Add Product */}
+            <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
+              <h3 className="text-sm font-bold text-warm-gray-900 mb-3 flex items-center gap-2">⚡ Quick Add Product</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-6 gap-2">
+                <input type="text" value={quickProduct.name} onChange={(e) => setQuickProduct({ ...quickProduct, name: e.target.value })}
+                  placeholder="Product Name *" className="sm:col-span-2 border border-warm-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                <input type="number" value={quickProduct.price} onChange={(e) => setQuickProduct({ ...quickProduct, price: e.target.value })}
+                  placeholder="Price (Rs.) *" className="border border-warm-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                <input type="url" value={quickProduct.image} onChange={(e) => setQuickProduct({ ...quickProduct, image: e.target.value })}
+                  placeholder="Image URL (paste)" className="sm:col-span-2 border border-warm-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                <button onClick={handleQuickAddProduct}
+                  className="bg-green-500 text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-1">
+                  <Plus size={16} /> Add
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                <select value={quickProduct.category} onChange={(e) => setQuickProduct({ ...quickProduct, category: e.target.value })}
+                  className="border border-warm-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-200">
+                  <option value="">Category (optional)</option>
+                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <input type="text" value={quickProduct.description} onChange={(e) => setQuickProduct({ ...quickProduct, description: e.target.value })}
+                  placeholder="Short description (optional)" className="border border-warm-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+              </div>
+            </div>
+
             <div className="mb-6 flex flex-col sm:flex-row gap-3">
               <button
                 onClick={openAddProduct}
@@ -775,23 +845,70 @@ export default function AdminPage() {
               </div>
             ) : (
               <div className="divide-y divide-warm-gray-100">
-                {requests.map((req) => (
-                  <div key={req.id} className="p-4 sm:p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="font-medium text-warm-gray-900">{req.name}</h3>
-                        <p className="text-sm text-warm-gray-500 mt-1">📞 {req.phone}</p>
+                {requests.map((req: any) => (
+                  <div key={req.id} className="p-4 sm:p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-warm-gray-900">{req.name}</h3>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                            req.status === "approved" ? "bg-green-100 text-green-700" :
+                            req.status === "rejected" ? "bg-rose-100 text-rose-700" :
+                            "bg-yellow-100 text-yellow-700"
+                          }`}>{req.status}</span>
+                        </div>
+                        <p className="text-sm text-warm-gray-500">📞 {req.phone}</p>
                         <p className="text-sm text-warm-gray-500">📍 {req.city}</p>
-                        {req.message && <p className="text-sm text-warm-gray-400 mt-2 italic">&ldquo;{req.message}&rdquo;</p>}
+                        {req.message && <p className="text-xs text-warm-gray-400 mt-1 italic">&ldquo;{req.message}&rdquo;</p>}
                       </div>
-                      <a
-                        href={`https://wa.me/92${req.phone.replace(/^0/, "")}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex-shrink-0"
-                      >
-                        WhatsApp
-                      </a>
+                      <div className="flex flex-col gap-2 flex-shrink-0">
+                        {req.status === "pending" && (
+                          <>
+                            <button
+                              onClick={async () => {
+                                const res = await fetch(`/api/admin/join-requests/${req.id}`, {
+                                  method: "PUT", headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ action: "approve" }),
+                                });
+                                if (res.ok) {
+                                  const data = await res.json();
+                                  alert(`✅ Approved! Team account ban gaya.\n\nLogin: ${req.phone}\nPassword: ${data.defaultPassword}\n\nYe info WhatsApp par bhejein.`);
+                                  loadData();
+                                }
+                              }}
+                              className="bg-green-500 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors"
+                            >
+                              ✅ Approve
+                            </button>
+                            <button
+                              onClick={async () => {
+                                await fetch(`/api/admin/join-requests/${req.id}`, {
+                                  method: "PUT", headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ action: "reject" }),
+                                });
+                                alert("Rejected.");
+                                loadData();
+                              }}
+                              className="bg-warm-gray-200 text-warm-gray-600 px-4 py-2 rounded-lg text-xs font-medium hover:bg-warm-gray-300 transition-colors"
+                            >
+                              ✕ Reject
+                            </button>
+                          </>
+                        )}
+                        <a
+                          href={`https://wa.me/92${req.phone.replace(/^0/, "")}?text=${encodeURIComponent(
+                            req.status === "approved"
+                              ? `Assalam o Alaikum ${req.name}!\n\nAap ki Momis Wardrobe team request APPROVE ho gayi! 🎉\n\nTeam Login:\n📱 Phone: ${req.phone}\n🔑 Password: ${req.phone.slice(-4)}mw\n\nLogin karein: momis-wardrobe-vert.vercel.app/team\n\nShukriya! 💕`
+                              : req.status === "rejected"
+                              ? `Assalam o Alaikum ${req.name}, aap ki request is waqt approve nahi ho saki. Baad mein dobara try karein.`
+                              : `Assalam o Alaikum ${req.name}! Aap ki team join request mil gayi hai. Jald review hogi. Shukriya!`
+                          )}`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="bg-green-50 text-green-700 px-4 py-2 rounded-lg text-xs font-medium hover:bg-green-100 transition-colors text-center"
+                        >
+                          💬 WhatsApp
+                        </a>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -898,6 +1015,53 @@ export default function AdminPage() {
               )}
             </div>
           </>
+        )}
+
+        {/* NOTIFICATIONS TAB */}
+        {activeTab === "notifications" && (
+          <div className="space-y-6 max-w-2xl">
+            {/* Send Notification */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-semibold text-warm-gray-900 mb-4 flex items-center gap-2">
+                📢 Send Notification to All Users
+              </h3>
+              <div className="space-y-3">
+                <input type="text" value={notifForm.title} onChange={(e) => setNotifForm({ ...notifForm, title: e.target.value })}
+                  placeholder="Title (e.g., New Collection Arrived! 🎉)" className="w-full border border-warm-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                <textarea value={notifForm.body} onChange={(e) => setNotifForm({ ...notifForm, body: e.target.value })} rows={3}
+                  placeholder="Message likhein... (e.g., 30% OFF sab products par! Jaldi karein...)" className="w-full border border-warm-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                <input type="text" value={notifForm.url} onChange={(e) => setNotifForm({ ...notifForm, url: e.target.value })}
+                  placeholder="Link (optional, e.g., /sale)" className="w-full border border-warm-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                <button onClick={handleSendNotification}
+                  className="w-full bg-gradient-to-r from-rose-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all">
+                  📤 Send Notification
+                </button>
+              </div>
+            </div>
+
+            {/* Past Notifications */}
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="px-4 py-3 bg-warm-gray-50 border-b border-warm-gray-100">
+                <h3 className="text-sm font-semibold text-warm-gray-700">Sent Notifications</h3>
+              </div>
+              {notifList.length === 0 ? (
+                <div className="py-10 text-center text-warm-gray-400 text-sm">Koi notification nahi bheji abhi tak</div>
+              ) : (
+                <div className="divide-y divide-warm-gray-50">
+                  {notifList.map((n) => (
+                    <div key={n.id} className="px-4 py-3">
+                      <p className="text-sm font-semibold text-warm-gray-900">{n.title}</p>
+                      <p className="text-xs text-warm-gray-500 mt-0.5">{n.body}</p>
+                      <p className="text-[10px] text-warm-gray-300 mt-1">
+                        {new Date(n.createdAt).toLocaleDateString("en-PK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        {n.url && n.url !== "/" && <span> • Link: {n.url}</span>}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* SETTINGS TAB */}
