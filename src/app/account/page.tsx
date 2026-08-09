@@ -67,7 +67,11 @@ export default function AccountPage() {
       if (res.ok) {
         setOtpSent(data.otp);
         setOtpStep(true);
-        showToast(`OTP aap ke number par bheja gaya: ${data.otp}`, "success");
+        // Open WhatsApp to send OTP to customer for FREE
+        if (data.whatsappLink) {
+          window.open(data.whatsappLink, "_blank");
+        }
+        showToast("WhatsApp khul raha hai — OTP customer ko bhejein!", "success");
       } else {
         setErrorMsg(data.error);
       }

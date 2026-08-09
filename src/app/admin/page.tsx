@@ -98,6 +98,8 @@ export default function AdminPage() {
   const [notifList, setNotifList] = useState<{ id: number; title: string; body: string; url: string | null; createdAt: string }[]>([]);
   const [notifForm, setNotifForm] = useState({ title: "", body: "", url: "" });
   const [quickProduct, setQuickProduct] = useState({ name: "", price: "", image: "", category: "", description: "" });
+  const [bulkText, setBulkText] = useState("");
+  const [bulkMargin, setBulkMargin] = useState("250");
   
   // Product form
   const [showProductForm, setShowProductForm] = useState(false);
@@ -219,6 +221,31 @@ export default function AdminPage() {
         loadData();
       }
     } catch { alert("Failed"); }
+  };
+
+  const handleBulkPaste = async () => {
+    if (!bulkText.trim()) { alert("Paste box mein products likhein"); return; }
+    const margin = parseInt(bulkMargin) || 250;
+    const lines = bulkText.trim().split("\n").filter(Boolean);
+    let added = 0;
+    for (const line of lines) {
+      // Format: "Product Name - 1500" or "Product Name, 1500" or "Product Name 1500"
+      const match = line.match(/^(.+?)[\s,\-—|]+(?:Rs\.?\s*)?(\d+)\s*$/i);
+      if (match) {
+        const name = match[1].trim();
+        const price = parseInt(match[2]) + margin;
+        try {
+          const res = await fetch("/api/admin/products", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, price: String(price), description: name, images: [], sizes: [], colors: [], featured: true, inStock: true }),
+          });
+          if (res.ok) added++;
+        } catch {}
+      }
+    }
+    alert(`${added} products add ho gaye! (Rs. ${margin} margin per product)`);
+    setBulkText("");
+    loadData();
   };
 
   const handleCreateDiscount = async () => {
@@ -575,6 +602,26 @@ export default function AdminPage() {
         {/* PRODUCTS TAB */}
         {activeTab === "products" && (
           <>
+            {/* 📋 Bulk Paste — Markaz se copy paste */}
+            <div className="bg-gradient-to-r from-purple-50 to-rose-50 rounded-xl border border-purple-200 p-5 mb-4">
+              <h3 className="text-sm font-bold text-warm-gray-900 mb-1 flex items-center gap-2">📋 Markaz Se Copy Paste</h3>
+              <p className="text-[10px] text-warm-gray-500 mb-3">Markaz se product name aur price copy karein, har line mein ek product likhein: <span className="font-mono bg-white px-1 rounded">Product Name - 1500</span></p>
+              <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={4}
+                placeholder={"Embroidered Chiffon Maxi - 3150\nDigital Print Lawn Suit - 1180\nMatte Lipstick Set - 750\nGold Plated Jewellery - 899"}
+                className="w-full border border-purple-200 rounded-lg px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white" />
+              <div className="flex gap-2 mt-2">
+                <div className="flex items-center gap-2 bg-white border border-purple-200 rounded-lg px-3 py-2">
+                  <span className="text-[10px] text-warm-gray-500 whitespace-nowrap">Margin Rs.</span>
+                  <input type="number" value={bulkMargin} onChange={(e) => setBulkMargin(e.target.value)}
+                    className="w-16 text-sm font-bold text-purple-600 focus:outline-none" />
+                </div>
+                <button onClick={handleBulkPaste}
+                  className="flex-1 bg-purple-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-purple-700 transition-colors">
+                  📋 Paste & Add All Products
+                </button>
+              </div>
+            </div>
+
             {/* ⚡ Quick Add Product */}
             <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
               <h3 className="text-sm font-bold text-warm-gray-900 mb-3 flex items-center gap-2">⚡ Quick Add Product</h3>
