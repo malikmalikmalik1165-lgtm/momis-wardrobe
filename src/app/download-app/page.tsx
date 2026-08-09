@@ -163,15 +163,22 @@ export default function DownloadAppPage() {
                 </div>
               </div>
               <p className="text-sm text-warm-gray-600 mb-4">
-                Agar aap APK file chahte hain jo PlayStore ki tarah install ho, to humein WhatsApp par message karein — hum APK bhej denge!
+                APK file chahiye jo PlayStore ki tarah install ho? 2 tareeqe hain:
               </p>
+              <div className="space-y-3 mb-4">
+                <div className="bg-warm-gray-50 rounded-lg p-3">
+                  <p className="text-xs font-bold text-warm-gray-900 mb-1">Option 1: PWABuilder (Free)</p>
+                  <p className="text-[11px] text-warm-gray-500">pwabuilder.com par jao → Website URL dalo → APK download karo → Phone mein install karo</p>
+                </div>
+                <div className="bg-warm-gray-50 rounded-lg p-3">
+                  <p className="text-xs font-bold text-warm-gray-900 mb-1">Option 2: Hum Se Mangwayein</p>
+                  <p className="text-[11px] text-warm-gray-500">WhatsApp par request karein, hum APK file bhej denge</p>
+                </div>
+              </div>
               <a href="https://wa.me/923295578925?text=Momis%20Wardrobe%20ka%20APK%20chahiye" target="_blank" rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 bg-green-500 text-white py-3 rounded-xl font-semibold hover:bg-green-600 transition-colors">
                 <MessageCircle size={16} /> APK WhatsApp Par Mangwayein
               </a>
-              <p className="text-[10px] text-warm-gray-400 text-center mt-2">
-                💡 PWA app bilkul APK jaise kaam karta hai — try karein!
-              </p>
             </div>
           </div>
         </div>

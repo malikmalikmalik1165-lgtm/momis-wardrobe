@@ -7,45 +7,45 @@ import { Clock, ArrowRight, User, Tag } from "lucide-react";
 const BLOGS = [
   {
     id: 1, slug: "summer-lawn-trends-2025",
-    title: "Summer Lawn Trends 2025 — Kya Pehnein Is Season?",
+    title: "Summer Lawn Trends 2026 — Kya Pehnein Is Season?",
     excerpt: "Is saal ke hottest lawn trends jaanein. Digital prints, pastel shades, aur embroidered borders — sab kuch yahan.",
     image: "https://images.pexels.com/photos/36567522/pexels-photo-36567522.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=600&w=900",
-    category: "Fashion Trends", author: "Momis Team", date: "Jul 28, 2025", readTime: "3 min",
+    category: "Fashion Trends", author: "Momis Team", date: "Jan 15, 2026", readTime: "3 min",
   },
   {
     id: 2, slug: "how-to-style-pakistani-suits",
     title: "Pakistani Suits Ko Style Karne Ke 7 Tareeqe",
     excerpt: "Ek hi suit ko different ways mein style karein — office, party, casual sab ke liye tips.",
     image: "https://images.pexels.com/photos/31874448/pexels-photo-31874448.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=600&w=900",
-    category: "Style Guide", author: "Momis Team", date: "Jul 20, 2025", readTime: "5 min",
+    category: "Style Guide", author: "Momis Team", date: "Jan 10, 2026", readTime: "5 min",
   },
   {
     id: 3, slug: "earn-from-home-reselling",
-    title: "Ghar Baithay Paise Kamayein — Reselling Guide 2025",
+    title: "Ghar Baithay Paise Kamayein — Reselling Guide 2026",
     excerpt: "Zero investment se online business shuru karein. Step by step complete guide for Pakistani women.",
     image: "https://images.pexels.com/photos/7290640/pexels-photo-7290640.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=600&w=900",
-    category: "Earning", author: "Momis Team", date: "Jul 15, 2025", readTime: "4 min",
+    category: "Earning", author: "Momis Team", date: "Jan 5, 2026", readTime: "4 min",
   },
   {
     id: 4, slug: "skincare-routine-for-pakistani-women",
     title: "Pakistani Climate Ke Liye Best Skincare Routine",
     excerpt: "Garmi mein skin care kaise karein? Budget-friendly products aur daily routine tips.",
     image: "https://images.pexels.com/photos/8990700/pexels-photo-8990700.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=600&w=900",
-    category: "Beauty", author: "Momis Team", date: "Jul 10, 2025", readTime: "4 min",
+    category: "Beauty", author: "Momis Team", date: "Dec 28, 2025", readTime: "4 min",
   },
   {
     id: 5, slug: "14-august-outfit-ideas",
     title: "14 August Outfit Ideas — Azaadi Day Style Guide 🇵🇰",
     excerpt: "Independence Day par kya pehnen? Green & white styling ideas for the whole family.",
     image: "https://images.pexels.com/photos/28837083/pexels-photo-28837083.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=600&w=900",
-    category: "Occasions", author: "Momis Team", date: "Jul 5, 2025", readTime: "3 min",
+    category: "Occasions", author: "Momis Team", date: "Dec 20, 2025", readTime: "3 min",
   },
   {
     id: 6, slug: "handbag-guide-for-every-occasion",
     title: "Har Occasion Ke Liye Perfect Handbag Kaise Chunein",
     excerpt: "Office, party, casual outing — har event ke liye sahi bag select karna seekhein.",
     image: "https://images.pexels.com/photos/18601568/pexels-photo-18601568.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=600&w=900",
-    category: "Style Guide", author: "Momis Team", date: "Jun 28, 2025", readTime: "3 min",
+    category: "Style Guide", author: "Momis Team", date: "Dec 15, 2025", readTime: "3 min",
   },
 ];
 

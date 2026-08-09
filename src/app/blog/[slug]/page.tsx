@@ -7,12 +7,12 @@ import { useParams } from "next/navigation";
 
 const BLOG_CONTENT: Record<string, { title: string; category: string; date: string; readTime: string; image: string; content: string[] }> = {
   "summer-lawn-trends-2025": {
-    title: "Summer Lawn Trends 2025 — Kya Pehnein Is Season?",
-    category: "Fashion Trends", date: "Jul 28, 2025", readTime: "3 min",
+    title: "Summer Lawn Trends 2026 — Kya Pehnein Is Season?",
+    category: "Fashion Trends", date: "Jan 15, 2026", readTime: "3 min",
     image: "https://images.pexels.com/photos/36567522/pexels-photo-36567522.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=800&w=1400",
     content: [
       "Is saal ka summer lawn season bohot exciting hai! Digital prints se le kar hand-embroidered borders tak, har kisi ke liye kuch na kuch hai.",
-      "2025 mein pastel shades bohot trend kar rahe hain — lavender, mint green, aur soft pink. Ye colors garmi mein cool feel dete hain aur elegant bhi lagte hain.",
+      "2026 mein pastel shades bohot trend kar rahe hain — lavender, mint green, aur soft pink. Ye colors garmi mein cool feel dete hain aur elegant bhi lagte hain.",
       "Fabric ki baat karein to pure lawn sabse zyada demand mein hai kyunke breathable hai aur comfortable bhi. Blended fabrics bhi popular hain jo wrinkle-free rehte hain.",
       "Embroidery mein minimalist designs trend kar rahe hain — subtle neckline embroidery aur border work. Heavy embroidery ki jagah clean aur classy look prefer ho raha hai.",
       "Dupatta trends mein chiffon aur organza top par hain. Printed dupattas bhi bohot chal rahe hain jo plain suits ke saath pair karein to bohot acha lagta hai.",
@@ -21,7 +21,7 @@ const BLOG_CONTENT: Record<string, { title: string; category: string; date: stri
   },
   "how-to-style-pakistani-suits": {
     title: "Pakistani Suits Ko Style Karne Ke 7 Tareeqe",
-    category: "Style Guide", date: "Jul 20, 2025", readTime: "5 min",
+    category: "Style Guide", date: "Jan 10, 2026", readTime: "5 min",
     image: "https://images.pexels.com/photos/31874448/pexels-photo-31874448.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=800&w=1400",
     content: [
       "Ek acha suit multiple ways mein style ho sakta hai. Yahan 7 tareeqe hain jo aap try kar sakte hain:",
@@ -35,8 +35,8 @@ const BLOG_CONTENT: Record<string, { title: string; category: string; date: stri
     ],
   },
   "earn-from-home-reselling": {
-    title: "Ghar Baithay Paise Kamayein — Reselling Guide 2025",
-    category: "Earning", date: "Jul 15, 2025", readTime: "4 min",
+    title: "Ghar Baithay Paise Kamayein — Reselling Guide 2026",
+    category: "Earning", date: "Jan 5, 2026", readTime: "4 min",
     image: "https://images.pexels.com/photos/7290640/pexels-photo-7290640.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=800&w=1400",
     content: [
       "Kya aap ghar baithay earning karna chahte hain? Momis Wardrobe ka reseller program aap ke liye hai!",

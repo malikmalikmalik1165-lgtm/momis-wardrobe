@@ -4,330 +4,202 @@ import { db } from "@/db";
 import { products, reviews, categories } from "@/db/schema";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import ProductCard from "@/components/ProductCard";
-import { ArrowRight, Truck, Shield, RotateCcw, Sparkles, Star, Phone, MessageCircle, Banknote } from "lucide-react";
+import { ArrowRight, Truck, Shield, RotateCcw, Banknote, Star, MessageCircle, Sparkles } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 async function getData() {
   const allCategories = await db.select().from(categories);
-  const featuredProducts = await db
-    .select()
-    .from(products)
-    .where(eq(products.featured, true))
-    .orderBy(desc(products.createdAt))
-    .limit(8);
-
+  const featuredProducts = await db.select().from(products)
+    .where(eq(products.featured, true)).orderBy(desc(products.createdAt)).limit(8);
   const productIds = featuredProducts.map((p) => p.id);
   let reviewStats: { productId: number; avg: string; count: string }[] = [];
-
   if (productIds.length > 0) {
-    reviewStats = await db
-      .select({
-        productId: reviews.productId,
-        avg: sql<string>`ROUND(AVG(${reviews.rating})::numeric, 1)`,
-        count: sql<string>`COUNT(*)`,
-      })
-      .from(reviews)
-      .where(inArray(reviews.productId, productIds))
-      .groupBy(reviews.productId);
+    reviewStats = await db.select({
+      productId: reviews.productId,
+      avg: sql<string>`ROUND(AVG(${reviews.rating})::numeric, 1)`,
+      count: sql<string>`COUNT(*)`,
+    }).from(reviews).where(inArray(reviews.productId, productIds)).groupBy(reviews.productId);
   }
-
-  const statsMap = new Map(
-    reviewStats.map((s) => [
-      s.productId,
-      { avg: parseFloat(s.avg), count: parseInt(s.count) },
-    ])
-  );
-
-  const enrichedProducts = featuredProducts.map((p) => ({
-    ...p,
-    averageRating: statsMap.get(p.id)?.avg || 0,
-    reviewCount: statsMap.get(p.id)?.count || 0,
-  }));
-
-  return { categories: allCategories, featuredProducts: enrichedProducts };
+  const statsMap = new Map(reviewStats.map((s) => [s.productId, { avg: parseFloat(s.avg), count: parseInt(s.count) }]));
+  return {
+    categories: allCategories,
+    featuredProducts: featuredProducts.map((p) => ({
+      ...p, averageRating: statsMap.get(p.id)?.avg || 0, reviewCount: statsMap.get(p.id)?.count || 0,
+    })),
+  };
 }
 
 export default async function HomePage() {
   const { categories: cats, featuredProducts } = await getData();
 
   return (
-    <div className="pt-[calc(2.5rem+3.5rem)] sm:pt-[calc(2.5rem+4rem)]">
-      {/* ===== HERO ===== */}
-      <section className="relative overflow-hidden bg-warm-gray-900 min-h-[85vh] sm:min-h-[90vh] flex items-center">
+    <div className="pt-[calc(2rem+3.5rem)] sm:pt-[calc(2rem+5.5rem)]">
+
+      {/* ══════ HERO ══════ */}
+      <section className="relative bg-warm-gray-900 overflow-hidden">
         <div className="absolute inset-0">
-          <Image
-            src="https://images.pexels.com/photos/20777181/pexels-photo-20777181.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1400&w=2000"
-            alt="Fashion"
-            fill
-            className="object-cover opacity-30 scale-105"
-            priority
-            sizes="100vw"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-warm-gray-900/95 via-warm-gray-900/70 to-warm-gray-900/40" />
-          <div className="absolute inset-0 bg-gradient-to-t from-warm-gray-900/80 via-transparent to-transparent" />
+          <Image src="https://images.pexels.com/photos/20777181/pexels-photo-20777181.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1400&w=2000"
+            alt="" fill className="object-cover opacity-25" priority sizes="100vw" />
+          <div className="absolute inset-0 bg-gradient-to-r from-warm-gray-900 via-warm-gray-900/80 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-warm-gray-900 via-transparent to-transparent" />
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-20 sm:py-0 w-full">
-          <div className="max-w-2xl">
-            {/* Premium label */}
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-2 mb-6">
-              <span className="w-2 h-2 bg-rose-400 rounded-full animate-pulse" />
-              <span className="text-rose-300 text-xs tracking-[0.25em] uppercase font-medium">
-                New Collection 2025
-              </span>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-20 sm:py-32 lg:py-40">
+          <div className="max-w-xl">
+            <div className="inline-flex items-center gap-2 border border-white/15 rounded-full px-4 py-1.5 mb-8">
+              <span className="w-1.5 h-1.5 bg-rose-400 rounded-full animate-pulse" />
+              <span className="text-rose-300/90 text-[11px] tracking-[.2em] uppercase">New Collection 2026</span>
             </div>
 
-            <h1
-              className="text-4xl sm:text-5xl lg:text-7xl text-white leading-[1.05] mb-6 tracking-tight"
-              style={{ fontFamily: "'Playfair Display', serif" }}
-            >
-              Where
-              <br />
-              <span className="italic text-rose-300">Elegance</span>
-              <br />
-              Meets You<span className="text-rose-400">.</span>
+            <h1 className="text-[2.75rem] sm:text-6xl lg:text-[5.25rem] text-white leading-[1.05] tracking-tight mb-6"
+              style={{ fontFamily: "'Playfair Display', serif" }}>
+              Where<br /><em className="text-rose-300">Elegance</em><br />Meets You.
             </h1>
 
-            <p className="text-warm-gray-400 text-base sm:text-lg leading-relaxed mb-8 max-w-md">
-              Premium women&apos;s fashion curated for the modern Pakistani woman. From lawn suits to luxury accessories — delivered to your doorstep.
+            <p className="text-warm-gray-400 text-[15px] sm:text-lg leading-relaxed mb-10 max-w-md">
+              Premium women&apos;s fashion curated for the modern Pakistani woman — delivered to your door with cash on delivery.
             </p>
 
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/shop"
-                className="group inline-flex items-center gap-3 bg-white text-warm-gray-900 px-7 py-4 text-sm tracking-wider uppercase font-semibold hover:bg-rose-50 transition-all"
-              >
-                Shop Now
-                <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link href="/shop"
+                className="inline-flex items-center justify-center gap-2 bg-white text-warm-gray-900 h-13 px-8 text-sm font-semibold tracking-wide uppercase hover:bg-rose-50 transition-colors">
+                Shop Now <ArrowRight size={15} />
               </Link>
-              <a
-                href="https://wa.me/923295578925?text=Assalam%20o%20Alaikum!%20Mujhe%20order%20karna%20hai."
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-green-500 text-white px-7 py-4 text-sm tracking-wider uppercase font-semibold hover:bg-green-600 transition-all"
-              >
-                <MessageCircle size={16} />
-                WhatsApp Order
+              <a href="https://wa.me/923295578925" target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 bg-green-500/90 text-white h-13 px-8 text-sm font-semibold tracking-wide uppercase hover:bg-green-500 transition-colors">
+                <MessageCircle size={15} /> WhatsApp Order
               </a>
-            </div>
-
-            {/* Trust micro-badges */}
-            <div className="flex flex-wrap gap-x-6 gap-y-2 mt-10 text-warm-gray-500 text-xs">
-              <span className="flex items-center gap-1.5"><Banknote size={14} className="text-green-400" /> Cash on Delivery</span>
-              <span className="flex items-center gap-1.5"><Truck size={14} className="text-blue-400" /> All Pakistan Delivery</span>
-              <span className="flex items-center gap-1.5"><RotateCcw size={14} className="text-rose-400" /> 7-Day Returns</span>
             </div>
           </div>
         </div>
-
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden sm:flex flex-col items-center gap-2 text-white/30">
-          <span className="text-[10px] tracking-widest uppercase">Scroll</span>
-          <div className="w-px h-8 bg-gradient-to-b from-white/30 to-transparent" />
-        </div>
       </section>
 
-      {/* ===== TRUST BAR ===== */}
-      <section className="bg-white border-b border-warm-gray-100 relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ══════ TRUST STRIP ══════ */}
+      <section className="bg-white border-b border-warm-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-y-3 gap-x-6">
             {[
-              { icon: <Truck size={20} />, title: "Free Delivery", desc: "Rs. 5,000+ orders", color: "text-blue-500" },
-              { icon: <Banknote size={20} />, title: "Cash on Delivery", desc: "Pay at your door", color: "text-green-500" },
-              { icon: <RotateCcw size={20} />, title: "7-Day Returns", desc: "Easy exchange", color: "text-rose-500" },
-              { icon: <Shield size={20} />, title: "Secure Shopping", desc: "Data encrypted", color: "text-purple-500" },
-            ].map((item) => (
-              <div key={item.title} className="flex items-center gap-3">
-                <div className={`${item.color}`}>{item.icon}</div>
-                <div>
-                  <p className="text-xs font-bold text-warm-gray-800 tracking-wide">{item.title}</p>
-                  <p className="text-[10px] text-warm-gray-400">{item.desc}</p>
-                </div>
+              { icon: <Truck size={18}/>, label: "Free Delivery 5K+", color: "text-blue-500" },
+              { icon: <Banknote size={18}/>, label: "Cash on Delivery", color: "text-green-500" },
+              { icon: <RotateCcw size={18}/>, label: "7-Day Returns", color: "text-rose-500" },
+              { icon: <Shield size={18}/>, label: "Secure Shopping", color: "text-purple-500" },
+            ].map((t) => (
+              <div key={t.label} className="flex items-center gap-2.5">
+                <span className={t.color}>{t.icon}</span>
+                <span className="text-[12px] font-semibold text-warm-gray-700 tracking-wide">{t.label}</span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ===== CATEGORIES ===== */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-        <div className="text-center mb-14">
-          <span className="text-rose-500 text-[11px] tracking-[0.3em] uppercase font-medium">Explore</span>
-          <h2
-            className="text-3xl sm:text-4xl text-warm-gray-900 mt-3"
-            style={{ fontFamily: "'Playfair Display', serif" }}
-          >
-            Shop by Category
-          </h2>
-          <div className="w-12 h-0.5 bg-rose-400 mx-auto mt-4" />
+      {/* ══════ CATEGORIES ══════ */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+        <div className="text-center mb-10">
+          <p className="text-rose-500 text-[11px] tracking-[.25em] uppercase font-medium">Explore</p>
+          <h2 className="text-2xl sm:text-3xl text-warm-gray-900 mt-1.5" style={{ fontFamily: "'Playfair Display', serif" }}>Shop by Category</h2>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {cats.slice(0, 8).map((cat) => (
-            <Link
-              key={cat.id}
-              href={`/shop?category=${cat.slug}`}
-              className="group relative aspect-[3/4] rounded-2xl overflow-hidden luxury-card"
-            >
-              {cat.image && (
-                <Image
-                  src={cat.image}
-                  alt={cat.name}
-                  fill
-                  className="object-cover group-hover:scale-110 transition-transform duration-700"
-                  sizes="(max-width: 640px) 50vw, 25vw"
-                />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5">
-                <h3 className="font-serif text-lg sm:text-xl text-white mb-0.5">{cat.name}</h3>
-                <span className="inline-flex items-center gap-1 text-white/80 text-xs group-hover:gap-2 transition-all">
-                  Shop Now <ArrowRight size={12} />
-                </span>
+            <Link key={cat.id} href={`/shop?category=${cat.slug}`}
+              className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-warm-gray-100">
+              {cat.image && <Image src={cat.image} alt={cat.name} fill className="object-cover group-hover:scale-105 transition-transform duration-700" sizes="(max-width:640px) 50vw,25vw" />}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+              <div className="absolute bottom-0 inset-x-0 p-4">
+                <h3 className="text-white font-semibold text-[15px]">{cat.name}</h3>
+                <span className="text-white/60 text-[11px] flex items-center gap-1 mt-0.5 group-hover:gap-2 transition-all">Shop <ArrowRight size={11}/></span>
               </div>
             </Link>
           ))}
         </div>
       </section>
 
-      {/* ===== FEATURED PRODUCTS ===== */}
-      <section className="bg-white py-16 sm:py-24">
+      {/* ══════ FEATURED PRODUCTS ══════ */}
+      <section className="bg-white py-14 sm:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-end justify-between mb-12">
+          <div className="flex items-end justify-between mb-10">
             <div>
-              <span className="text-rose-500 text-[11px] tracking-[0.3em] uppercase font-medium">Curated</span>
-              <h2
-                className="text-3xl sm:text-4xl text-warm-gray-900 mt-2"
-                style={{ fontFamily: "'Playfair Display', serif" }}
-              >
-                Featured Collection
-              </h2>
-              <div className="w-12 h-0.5 bg-rose-400 mt-4" />
+              <p className="text-rose-500 text-[11px] tracking-[.25em] uppercase font-medium">Curated</p>
+              <h2 className="text-2xl sm:text-3xl text-warm-gray-900 mt-1.5" style={{ fontFamily: "'Playfair Display', serif" }}>Featured Collection</h2>
             </div>
-            <Link
-              href="/shop"
-              className="hidden sm:inline-flex items-center gap-2 text-sm text-warm-gray-600 hover:text-rose-500 transition-colors font-medium"
-            >
-              View All <ArrowRight size={14} />
+            <Link href="/shop" className="hidden sm:flex items-center gap-1.5 text-sm text-warm-gray-500 hover:text-rose-500 transition-colors font-medium">
+              View All <ArrowRight size={14}/>
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-            {featuredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
+            {featuredProducts.map((p) => <ProductCard key={p.id} product={p} />)}
           </div>
 
-          <div className="mt-10 text-center sm:hidden">
-            <Link
-              href="/shop"
-              className="inline-flex items-center gap-2 bg-warm-gray-900 text-white px-8 py-3.5 text-sm tracking-wider uppercase font-medium"
-            >
-              View All <ArrowRight size={14} />
+          <div className="mt-8 text-center sm:hidden">
+            <Link href="/shop" className="inline-flex items-center gap-2 bg-warm-gray-900 text-white px-7 py-3 text-sm font-semibold uppercase tracking-wide">
+              View All <ArrowRight size={14}/>
             </Link>
           </div>
         </div>
       </section>
 
-      {/* ===== EDITORIAL SPLIT ===== */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-10 items-center">
-          <div className="relative aspect-[4/5] rounded-3xl overflow-hidden luxury-glow">
-            <Image
-              src="https://images.pexels.com/photos/31874448/pexels-photo-31874448.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=900"
-              alt="Elegant Pakistani fashion"
-              fill
-              className="object-cover"
-              sizes="(max-width: 1024px) 100vw, 50vw"
-            />
+      {/* ══════ EDITORIAL ══════ */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+          <div className="relative aspect-[4/5] rounded-2xl overflow-hidden">
+            <Image src="https://images.pexels.com/photos/31874448/pexels-photo-31874448.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=900"
+              alt="Pakistani fashion" fill className="object-cover" sizes="(max-width:1024px) 100vw,50vw" />
           </div>
-          <div className="lg:pl-10">
-            <span className="text-rose-500 text-[11px] tracking-[0.3em] uppercase font-medium">Our Promise</span>
-            <h2
-              className="text-3xl sm:text-4xl text-warm-gray-900 mt-3 mb-6 leading-tight"
-              style={{ fontFamily: "'Playfair Display', serif" }}
-            >
-              Fashion That<br />
-              <span className="italic text-rose-500">Celebrates</span> You
+          <div className="lg:pl-8">
+            <p className="text-rose-500 text-[11px] tracking-[.25em] uppercase font-medium">Our Promise</p>
+            <h2 className="text-3xl sm:text-4xl text-warm-gray-900 mt-2 mb-6 leading-snug" style={{ fontFamily: "'Playfair Display', serif" }}>
+              Fashion That<br /><em className="text-rose-400">Celebrates</em> You
             </h2>
-            <div className="w-12 h-0.5 bg-rose-400 mb-6" />
-            <p className="text-warm-gray-500 leading-relaxed mb-4">
-              Momis Wardrobe mein hum har Pakistani woman ke liye affordable luxury laate hain. Chahe aap unstitched lawn dhoondhein ya ready-to-wear suits — humara collection aap ke liye curate kiya gaya hai.
+            <p className="text-warm-gray-500 leading-relaxed mb-4 text-[15px]">
+              Momis Wardrobe mein hum har Pakistani woman ke liye affordable luxury laate hain. Quality fabrics, trending designs, aur fast delivery ke saath.
             </p>
-            <p className="text-warm-gray-500 leading-relaxed mb-8">
-              Quality fabrics, trending designs, aur fast delivery ke saath hum aap ka fashion partner hain. Ab ghar baithay shopping karein aur Cash on Delivery par order karein!
+            <p className="text-warm-gray-500 leading-relaxed mb-8 text-[15px]">
+              Chahe aap unstitched lawn dhoondhein ya ready-to-wear — humara curated collection aap ke liye hai. Ab ghar baithay shopping karein!
             </p>
 
-            <div className="grid grid-cols-3 gap-4 mb-8">
-              {[
-                { num: "5K+", label: "Customers" },
-                { num: "500+", label: "Products" },
-                { num: "4.8★", label: "Rating" },
-              ].map((s) => (
-                <div key={s.label} className="text-center p-3 bg-warm-gray-50 rounded-xl">
-                  <p className="text-xl font-bold text-warm-gray-900">{s.num}</p>
-                  <p className="text-[10px] text-warm-gray-400 uppercase tracking-wider">{s.label}</p>
+            <div className="grid grid-cols-3 gap-3 mb-8">
+              {[{ n: "5K+", l: "Customers" }, { n: "500+", l: "Products" }, { n: "4.8★", l: "Rating" }].map((s) => (
+                <div key={s.l} className="bg-warm-gray-50 rounded-xl p-3 text-center">
+                  <p className="text-lg font-bold text-warm-gray-900">{s.n}</p>
+                  <p className="text-[9px] text-warm-gray-400 uppercase tracking-wider">{s.l}</p>
                 </div>
               ))}
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/shop"
-                className="inline-flex items-center gap-2 bg-warm-gray-900 text-white px-7 py-3.5 text-sm tracking-wider uppercase font-medium hover:bg-warm-gray-800 transition-colors"
-              >
-                Shop Now <ArrowRight size={14} />
-              </Link>
-              <a
-                href="https://wa.me/923295578925"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 border-2 border-green-500 text-green-600 px-7 py-3.5 text-sm tracking-wider uppercase font-medium hover:bg-green-50 transition-colors"
-              >
-                <Phone size={14} /> 03295578925
-              </a>
-            </div>
+            <Link href="/shop" className="inline-flex items-center gap-2 bg-warm-gray-900 text-white px-7 py-3.5 text-sm font-semibold uppercase tracking-wide hover:bg-warm-gray-800 transition-colors">
+              Shop Now <ArrowRight size={14}/>
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* ===== REVIEWS ===== */}
-      <section className="bg-warm-gray-900 text-white py-16 sm:py-24 overflow-hidden">
+      {/* ══════ REVIEWS ══════ */}
+      <section className="bg-warm-gray-900 py-14 sm:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <span className="text-rose-400 text-[11px] tracking-[0.3em] uppercase font-medium">Testimonials</span>
-            <h2
-              className="text-3xl sm:text-4xl text-white mt-3"
-              style={{ fontFamily: "'Playfair Display', serif" }}
-            >
-              Loved by <span className="italic text-rose-300">Thousands</span>
+          <div className="text-center mb-10">
+            <p className="text-rose-400 text-[11px] tracking-[.25em] uppercase font-medium">Testimonials</p>
+            <h2 className="text-2xl sm:text-3xl text-white mt-1.5" style={{ fontFamily: "'Playfair Display', serif" }}>
+              Loved by <em className="text-rose-300">Thousands</em>
             </h2>
-            <div className="w-12 h-0.5 bg-rose-400 mx-auto mt-4" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {[
-              { name: "Fatima A.", city: "Lahore", text: "Best quality! Maine 3 suits liye aur sab amazing hain. Fabric itna soft hai, highly recommend! ❤️" },
-              { name: "Ayesha K.", city: "Karachi", text: "COD available hai jo bohot convenient hai. Packaging bhi premium thi aur delivery fast. Will order again!" },
-              { name: "Sana M.", city: "Islamabad", text: "WhatsApp par bohot helpful hain. Size guide follow kiya aur perfect fit aayi. Love Momis Wardrobe! 🥰" },
-            ].map((review) => (
-              <div key={review.name} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 sm:p-8">
-                <div className="flex gap-0.5 mb-4">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} size={14} className="fill-gold-400 text-gold-400" />
-                  ))}
-                </div>
-                <p className="text-warm-gray-300 text-sm leading-relaxed mb-6 italic">
-                  &ldquo;{review.text}&rdquo;
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-rose-500/20 rounded-full flex items-center justify-center text-rose-300 font-bold text-sm">
-                    {review.name[0]}
-                  </div>
+              { name: "Fatima A.", city: "Lahore", text: "Best quality! 3 suits liye, sab amazing. Fabric bohot soft hai. ❤️" },
+              { name: "Ayesha K.", city: "Karachi", text: "COD available — bohot convenient. Packaging premium thi. Will order again!" },
+              { name: "Sana M.", city: "Islamabad", text: "WhatsApp par size guide follow kiya, perfect fit aayi. Love it! 🥰" },
+            ].map((r) => (
+              <div key={r.name} className="bg-white/[.06] border border-white/10 rounded-2xl p-6">
+                <div className="flex gap-0.5 mb-3">{[1,2,3,4,5].map((i) => <Star key={i} size={13} className="fill-amber-400 text-amber-400"/>)}</div>
+                <p className="text-warm-gray-300 text-sm leading-relaxed mb-5 italic">&ldquo;{r.text}&rdquo;</p>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 bg-rose-500/20 rounded-full flex items-center justify-center text-rose-300 font-bold text-xs">{r.name[0]}</div>
                   <div>
-                    <p className="text-sm font-semibold text-white">{review.name}</p>
-                    <p className="text-[10px] text-warm-gray-500">{review.city} • Verified Buyer ✓</p>
+                    <p className="text-white text-sm font-medium">{r.name}</p>
+                    <p className="text-warm-gray-500 text-[10px]">{r.city} · Verified ✓</p>
                   </div>
                 </div>
               </div>
@@ -336,64 +208,25 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ===== CTA ===== */}
-      <section className="relative overflow-hidden">
-        <div className="bg-gradient-to-r from-rose-500 via-pink-500 to-rose-600 py-16 sm:py-20">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center relative z-10">
-            <Sparkles className="mx-auto text-white/50 mb-4" size={28} />
-            <h2
-              className="text-3xl sm:text-4xl text-white mb-4"
-              style={{ fontFamily: "'Playfair Display', serif" }}
-            >
-              Ready to <span className="italic">Elevate</span> Your Style?
-            </h2>
-            <p className="text-rose-100 text-lg mb-8 max-w-xl mx-auto">
-              Order karein WhatsApp par ya website se. Cash on Delivery ke saath all Pakistan delivery!
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/shop"
-                className="inline-flex items-center justify-center gap-2 bg-white text-rose-600 px-8 py-4 rounded-full text-sm font-bold tracking-wider uppercase hover:bg-rose-50 transition-colors shadow-xl"
-              >
-                Shop Collection <ArrowRight size={16} />
-              </Link>
-              <a
-                href="https://wa.me/923295578925"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 bg-green-500 text-white px-8 py-4 rounded-full text-sm font-bold tracking-wider uppercase hover:bg-green-600 transition-colors shadow-xl"
-              >
-                <MessageCircle size={16} /> WhatsApp Order
-              </a>
-            </div>
-            <p className="text-white/60 text-xs mt-6">
-              📞 Call: 03295578925 • 🚚 Free delivery Rs. 5,000+ • 💵 COD Available
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ===== COMMUNITY ===== */}
-      <section className="bg-green-50 py-12 sm:py-16">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <MessageCircle className="mx-auto text-green-500 mb-4" size={32} />
-          <h2
-            className="text-2xl sm:text-3xl text-warm-gray-900 mb-3"
-            style={{ fontFamily: "'Playfair Display', serif" }}
-          >
-            Join Our WhatsApp Community
+      {/* ══════ CTA ══════ */}
+      <section className="bg-gradient-to-r from-rose-500 to-pink-500 py-14 sm:py-16">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
+          <Sparkles className="mx-auto text-white/40 mb-3" size={24}/>
+          <h2 className="text-2xl sm:text-3xl text-white mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>
+            Ready to <em>Elevate</em> Your Style?
           </h2>
-          <p className="text-warm-gray-500 mb-6">
-            New arrivals, exclusive discounts aur styling tips — sab se pehle aap ko milega!
+          <p className="text-rose-100 mb-8 max-w-lg mx-auto text-[15px]">
+            Order karein website se ya WhatsApp par. Cash on Delivery ke saath all Pakistan delivery!
           </p>
-          <a
-            href="https://chat.whatsapp.com/B9JHotGfxhICVZASVkwUIa"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-green-500 text-white px-8 py-4 rounded-full text-sm font-bold hover:bg-green-600 transition-colors shadow-lg shadow-green-200"
-          >
-            <MessageCircle size={18} /> Join Community
-          </a>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link href="/shop" className="inline-flex items-center justify-center gap-2 bg-white text-rose-600 h-12 px-8 rounded-full text-sm font-bold uppercase tracking-wide hover:bg-rose-50 transition-colors">
+              Shop Collection <ArrowRight size={15}/>
+            </Link>
+            <a href="https://wa.me/923295578925" target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 bg-white/20 text-white h-12 px-8 rounded-full text-sm font-bold uppercase tracking-wide hover:bg-white/30 transition-colors border border-white/30">
+              <MessageCircle size={15}/> WhatsApp
+            </a>
+          </div>
         </div>
       </section>
     </div>

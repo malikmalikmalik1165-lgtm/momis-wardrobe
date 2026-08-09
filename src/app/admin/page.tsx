@@ -25,6 +25,7 @@ import { formatPrice } from "@/lib/currency";
 
 interface Product {
   id: number;
+  sku: string | null;
   name: string;
   slug: string;
   description: string;
@@ -81,7 +82,7 @@ interface DiscountCode {
   createdAt: string;
 }
 
-type TabType = "products" | "categories" | "orders" | "requests" | "discounts" | "notifications" | "settings";
+type TabType = "products" | "categories" | "orders" | "requests" | "discounts" | "notifications" | "customers" | "team" | "settings";
 
 export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -92,6 +93,8 @@ export default function AdminPage() {
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [discounts, setDiscounts] = useState<DiscountCode[]>([]);
+  const [customerList, setCustomerList] = useState<any[]>([]);
+  const [teamList, setTeamList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
   const [discountForm, setDiscountForm] = useState({ code: "", percent: "", maxUses: "" });
@@ -179,6 +182,11 @@ export default function AdminPage() {
       // Load notifications
       const notifRes = await fetch("/api/admin/notifications");
       if (notifRes.ok) setNotifList(await notifRes.json());
+      // Load customers & team
+      const custRes = await fetch("/api/admin/customers");
+      if (custRes.ok) setCustomerList(await custRes.json());
+      const teamRes = await fetch("/api/admin/team");
+      if (teamRes.ok) setTeamList(await teamRes.json());
     } catch (e) {
       console.error(e);
     } finally {
@@ -571,6 +579,8 @@ export default function AdminPage() {
             { key: "orders", label: "Orders", icon: ShoppingCart },
             { key: "requests", label: "Join Requests", icon: Users },
             { key: "discounts", label: "Discounts", icon: Percent },
+            { key: "customers", label: "Customers", icon: Users },
+            { key: "team", label: "Team", icon: Users },
             { key: "notifications", label: "Notifications", icon: MessageCircle },
             { key: "settings", label: "Settings", icon: Settings },
           ].map((tab) => (
@@ -695,7 +705,10 @@ export default function AdminPage() {
                             )}
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-warm-gray-900 truncate">{product.name}</p>
-                              {product.badge && <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded">{product.badge}</span>}
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                {product.sku && <span className="text-[9px] font-mono bg-warm-gray-100 text-warm-gray-600 px-1.5 py-0.5 rounded">{product.sku}</span>}
+                                {product.badge && <span className="text-[9px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded">{product.badge}</span>}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -955,6 +968,10 @@ export default function AdminPage() {
                         >
                           💬 WhatsApp
                         </a>
+                        <button onClick={async () => { if(!confirm("Delete request?")) return; await fetch("/api/admin/join-requests",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:req.id})}); loadData(); }}
+                          className="bg-rose-50 text-rose-500 px-4 py-2 rounded-lg text-xs font-medium hover:bg-rose-100 transition-colors text-center">
+                          🗑 Delete
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1062,6 +1079,110 @@ export default function AdminPage() {
               )}
             </div>
           </>
+        )}
+
+        {/* CUSTOMERS TAB */}
+        {activeTab === "customers" && (
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-warm-gray-50 border-b border-warm-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-warm-gray-900">Registered Customers ({customerList.length})</h3>
+            </div>
+            {customerList.length === 0 ? (
+              <div className="py-12 text-center text-warm-gray-400">Koi customer registered nahi</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-warm-gray-50 text-[10px] text-warm-gray-500 uppercase">
+                    <tr>
+                      <th className="text-left px-4 py-2">Customer</th>
+                      <th className="text-left px-4 py-2">Phone</th>
+                      <th className="text-left px-4 py-2 hidden sm:table-cell">City</th>
+                      <th className="text-left px-4 py-2 hidden sm:table-cell">Joined</th>
+                      <th className="text-right px-4 py-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-warm-gray-50">
+                    {customerList.map((c: any) => (
+                      <tr key={c.id} className="hover:bg-warm-gray-50/50">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-warm-gray-900">{c.name}</p>
+                          {c.phoneVerified && <span className="text-[9px] text-green-600">✓ Verified</span>}
+                        </td>
+                        <td className="px-4 py-3 text-warm-gray-600">{c.phone}</td>
+                        <td className="px-4 py-3 text-warm-gray-500 hidden sm:table-cell">{c.city || "—"}</td>
+                        <td className="px-4 py-3 text-warm-gray-400 text-xs hidden sm:table-cell">{new Date(c.createdAt).toLocaleDateString("en-PK", {day:"numeric",month:"short"})}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <a href={`https://wa.me/92${c.phone.replace(/^0/,"")}`} target="_blank" rel="noopener noreferrer"
+                              className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg text-xs"><MessageCircle size={14}/></a>
+                            <button onClick={async () => { if(!confirm(`${c.name} ko delete karein?`)) return; await fetch(`/api/admin/customers/${c.id}`,{method:"DELETE"}); loadData(); }}
+                              className="p-1.5 text-warm-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TEAM MEMBERS TAB */}
+        {activeTab === "team" && (
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-warm-gray-50 border-b border-warm-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-warm-gray-900">Team Members ({teamList.length})</h3>
+            </div>
+            {teamList.length === 0 ? (
+              <div className="py-12 text-center text-warm-gray-400">Koi team member nahi</div>
+            ) : (
+              <div className="divide-y divide-warm-gray-50">
+                {teamList.map((m: any) => (
+                  <div key={m.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-semibold text-warm-gray-900">{m.name}</p>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${m.active ? "bg-green-100 text-green-700" : "bg-warm-gray-200 text-warm-gray-500"}`}>
+                          {m.active ? "Active" : "Inactive"}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-warm-gray-500">
+                        <span>📞 {m.phone}</span>
+                        <span>📍 {m.city || "—"}</span>
+                        <span className="font-mono bg-purple-50 text-purple-600 px-1.5 rounded">Code: {m.referralCode}</span>
+                      </div>
+                      <div className="flex gap-4 mt-2 text-xs">
+                        <span className="text-green-600 font-semibold">💰 {formatPrice(m.totalEarnings)}</span>
+                        <span className="text-warm-gray-500">📦 {m.totalSales} sales</span>
+                        <span className="text-purple-500">{m.commissionPercent}% commission</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Toggle Active */}
+                      <button onClick={async () => { await fetch(`/api/admin/team/${m.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({active:!m.active})}); loadData(); }}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold ${m.active ? "bg-warm-gray-100 text-warm-gray-600 hover:bg-warm-gray-200" : "bg-green-100 text-green-700 hover:bg-green-200"}`}>
+                        {m.active ? "Deactivate" : "Activate"}
+                      </button>
+                      {/* Edit Commission */}
+                      <button onClick={async () => {
+                        const pct = prompt(`Commission % for ${m.name}:`, String(m.commissionPercent));
+                        if(pct) { await fetch(`/api/admin/team/${m.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({commissionPercent:parseInt(pct)})}); loadData(); }
+                      }} className="px-3 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-[10px] font-semibold hover:bg-purple-100">
+                        Edit %
+                      </button>
+                      {/* WhatsApp */}
+                      <a href={`https://wa.me/92${m.phone.replace(/^0/,"")}`} target="_blank" rel="noopener noreferrer"
+                        className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg"><MessageCircle size={14}/></a>
+                      {/* Delete */}
+                      <button onClick={async () => { if(!confirm(`${m.name} ko delete karein?`)) return; await fetch(`/api/admin/team/${m.id}`,{method:"DELETE"}); loadData(); }}
+                        className="p-1.5 text-warm-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {/* NOTIFICATIONS TAB */}
