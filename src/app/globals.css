@@ -68,6 +68,21 @@
 .animate-fade-in-up { animation: fadeInUp .55s cubic-bezier(.22,1,.36,1) both; }
 .animate-fade-in { animation: fadeIn .3s ease-out both; }
 .animate-slide-in { animation: slideIn .3s ease-out both; }
+
+/* Scrolling marquee */
+@keyframes scroll-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-scroll { animation: scroll-left 25s linear infinite; }
+.animate-scroll:hover { animation-play-state: paused; }
+
+/* Pulse glow */
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(34,197,94,.3); }
+  50% { box-shadow: 0 0 20px rgba(34,197,94,.6); }
+}
+.animate-glow { animation: glow 2s ease-in-out infinite; }
 .animate-float { animation: float 3s ease-in-out infinite; }
 
 /* Premium scrollbar */

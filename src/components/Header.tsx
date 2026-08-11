@@ -173,6 +173,7 @@ export default function Header() {
                 { href: "/track", label: "Track Order" },
                 { href: "/blog", label: "Blog" },
                 { href: "/supplier", label: "Become a Supplier" },
+                { href: "/training", label: "🎓 Training" },
                 { href: "/download-app", label: "📱 App Download" },
               ].map((link) => (
                 <Link
@@ -234,6 +235,8 @@ export default function Header() {
                 { href: "/supplier", label: "🏭 Become a Supplier" },
                 { href: "/return-policy", label: "🔄 Return Policy" },
                 { href: "/size-guide", label: "📏 Size Guide" },
+                { href: "/training", label: "🎓 Training Academy" },
+                { href: "/terms", label: "📜 Terms & Policies" },
                 { href: "/join", label: "💰 Join & Earn" },
                 { href: "/team", label: "👥 Team Portal" },
               ].map((link) => (

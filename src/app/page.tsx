@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { products, reviews, categories } from "@/db/schema";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import ProductCard from "@/components/ProductCard";
+import AzadiSaleBanner from "@/components/AzadiSaleBanner";
+import ScrollingStrip from "@/components/ScrollingStrip";
 import { ArrowRight, Truck, Shield, RotateCcw, Banknote, Star, MessageCircle, Sparkles } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -33,8 +35,14 @@ async function getData() {
 export default async function HomePage() {
   const { categories: cats, featuredProducts } = await getData();
 
+  // Get all products for scrolling strip
+  const allProducts = await db.select().from(products).orderBy(desc(products.createdAt)).limit(16);
+
   return (
     <div className="pt-[calc(2rem+3.5rem)] sm:pt-[calc(2rem+5.5rem)]">
+
+      {/* ══════ AZADI SALE BANNER ══════ */}
+      <AzadiSaleBanner />
 
       {/* ══════ HERO ══════ */}
       <section className="relative bg-warm-gray-900 overflow-hidden">
@@ -93,6 +101,9 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ══════ SCROLLING STRIP ══════ */}
+      <ScrollingStrip products={allProducts} />
 
       {/* ══════ CATEGORIES ══════ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
