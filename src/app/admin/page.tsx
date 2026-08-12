@@ -8,6 +8,7 @@ import {
   Upload, Copy, Check, Search, Image as ImageIcon, Bell, RefreshCw,
 } from "lucide-react";
 import { formatPrice } from "@/lib/currency";
+import { printInvoice } from "@/components/InvoiceView";
 
 interface Product { id: number; sku: string | null; name: string; slug: string; description: string; price: string; compareAtPrice: string | null; categoryId: number | null; images: string[]; sizes: string[]; colors: string[]; inStock: boolean; featured: boolean; badge: string | null; }
 interface Category { id: number; name: string; slug: string; description: string | null; image: string | null; }
@@ -28,6 +29,8 @@ export default function AdminPage() {
   const [notifs, setNotifs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState("");
+  const [orderSearch, setOrderSearch] = useState("");
+  const [orderFilter, setOrderFilter] = useState("all");
 
   // Product add
   const [showAdd, setShowAdd] = useState(false);
@@ -108,30 +111,43 @@ export default function AdminPage() {
 
   const delProd = async (id: number) => { if (!confirm("Delete?")) return; await fetch(`/api/admin/products/${id}`, { method: "DELETE" }); load(); };
 
-  // Image paste from clipboard
+  // Image handling — paste, drag, file, URL
+  const addImageFromFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => { if (reader.result) setPf(prev => ({ ...prev, images: [...prev.images, reader.result as string] })); };
+    reader.readAsDataURL(file);
+  };
+
   const handlePaste = (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
     for (const item of Array.from(items)) {
       if (item.type.startsWith("image/")) {
         const file = item.getAsFile();
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = () => {
-            if (reader.result) setPf(prev => ({ ...prev, images: [...prev.images, reader.result as string] }));
-          };
-          reader.readAsDataURL(file);
-        }
+        if (file) addImageFromFile(file);
         e.preventDefault();
       }
       if (item.type === "text/plain") {
         item.getAsString((text) => {
-          if (text.match(/^https?:\/\/.+\.(jpg|jpeg|png|webp|gif)/i)) {
-            setPf(prev => ({ ...prev, images: [...prev.images, text.trim()] }));
-          }
+          const t = text.trim();
+          if (t.match(/^https?:\/\/.+/i)) setPf(prev => ({ ...prev, images: [...prev.images, t] }));
         });
       }
     }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setDragOver(false);
+    const files = e.dataTransfer?.files;
+    if (files) for (const file of Array.from(files)) { if (file.type.startsWith("image/")) addImageFromFile(file); }
+    const text = e.dataTransfer?.getData("text/plain");
+    if (text?.match(/^https?:\/\/.+/i)) setPf(prev => ({ ...prev, images: [...prev.images, text.trim()] }));
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) for (const file of Array.from(files)) { if (file.type.startsWith("image/")) addImageFromFile(file); }
+    e.target.value = "";
   };
 
   const addImageUrl = () => {
@@ -142,6 +158,86 @@ export default function AdminPage() {
   };
 
   const removeImage = (idx: number) => setPf(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
+
+  // Certificate generator
+  const generateCertificate = (memberName: string, type: string) => {
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) return;
+    const date = new Date().toLocaleDateString("en-PK", { day: "numeric", month: "long", year: "numeric" });
+    const certId = `MW-CERT-${Date.now().toString(36).toUpperCase()}`;
+    const titles: Record<string, { title: string; sub: string; color: string }> = {
+      completion: { title: "Certificate of Completion", sub: "Social Media Marketing Training", color: "#1e40af" },
+      performance: { title: "Certificate of Excellence", sub: "Outstanding Sales Performance", color: "#065f46" },
+      appreciation: { title: "Certificate of Appreciation", sub: "Dedicated Team Member", color: "#9f1239" },
+      top_seller: { title: "Top Seller Award", sub: "Monthly Best Performer", color: "#92400e" },
+      rising_star: { title: "Rising Star Award", sub: "Fastest Growing Member", color: "#5b21b6" },
+    };
+    const cert = titles[type] || titles.appreciation;
+
+    w.document.write(`<!DOCTYPE html><html><head><title>Certificate - ${memberName}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f5f5f4;font-family:'Georgia',serif}
+.cert{width:800px;background:white;border:3px solid ${cert.color};padding:12px;position:relative}
+.cert-inner{border:2px solid ${cert.color}44;padding:50px 60px;text-align:center;position:relative;min-height:520px}
+.corner{position:absolute;width:40px;height:40px;border:3px solid ${cert.color}}
+.tl{top:8px;left:8px;border-right:none;border-bottom:none}
+.tr{top:8px;right:8px;border-left:none;border-bottom:none}
+.bl{bottom:8px;left:8px;border-right:none;border-top:none}
+.br{bottom:8px;right:8px;border-left:none;border-top:none}
+.logo{font-size:16px;color:#a8a29e;letter-spacing:3px;text-transform:uppercase;margin-bottom:20px}
+.logo b{color:${cert.color}}
+.title{font-size:32px;color:${cert.color};margin:10px 0;font-weight:400;letter-spacing:2px}
+.sub{font-size:14px;color:#78716c;letter-spacing:1px;margin-bottom:30px}
+.presented{font-size:12px;color:#a8a29e;text-transform:uppercase;letter-spacing:3px}
+.name{font-size:38px;color:#1c1917;margin:15px 0;font-style:italic;border-bottom:2px solid ${cert.color}33;padding-bottom:10px;display:inline-block;min-width:350px}
+.desc{font-size:13px;color:#57534e;line-height:1.8;max-width:500px;margin:20px auto}
+.footer{display:flex;justify-content:space-between;align-items:flex-end;margin-top:40px}
+.sign-box{text-align:center}
+.sign-line{width:150px;border-top:1px solid #1c1917;margin-top:40px;padding-top:6px}
+.sign-name{font-size:11px;color:#1c1917;font-weight:bold}
+.sign-title{font-size:9px;color:#78716c}
+.stamp{width:80px;height:80px;border:3px solid ${cert.color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;color:${cert.color};text-align:center;font-weight:bold;text-transform:uppercase;letter-spacing:1px;line-height:1.2;transform:rotate(-15deg);opacity:.7}
+.cert-id{font-size:9px;color:#d6d3d1;position:absolute;bottom:15px;right:20px}
+.date{font-size:11px;color:#78716c;margin-top:5px}
+@media print{body{background:white}button{display:none!important}.cert{border:3px solid ${cert.color}}}
+</style></head><body>
+<div>
+<div class="cert">
+<div class="cert-inner">
+<div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+<div class="logo">Momis <b>Wardrobe</b></div>
+<div class="title">${cert.title}</div>
+<div class="sub">${cert.sub}</div>
+<div class="presented">This certificate is proudly presented to</div>
+<div class="name">${memberName}</div>
+<div class="desc">In recognition of exceptional dedication, professional excellence, and valuable contribution to Momis Wardrobe's mission of empowering women through fashion entrepreneurship in Pakistan.</div>
+<div class="footer">
+<div class="sign-box">
+<div class="sign-line">
+<div class="sign-name">Momis Wardrobe</div>
+<div class="sign-title">Owner & CEO</div>
+</div>
+</div>
+<div class="stamp">MOMIS<br/>WARDROBE<br/>✦<br/>CERTIFIED</div>
+<div class="sign-box">
+<div class="date">${date}</div>
+<div class="sign-line">
+<div class="sign-name">Date of Issue</div>
+<div class="sign-title">Certificate ID: ${certId}</div>
+</div>
+</div>
+</div>
+<div class="cert-id">${certId}</div>
+</div>
+</div>
+<div style="text-align:center;margin-top:20px">
+<button onclick="window.print()" style="background:#1c1917;color:white;border:none;padding:12px 40px;border-radius:8px;font-size:14px;cursor:pointer;font-family:sans-serif">🖨 Print / Save as PDF</button>
+</div>
+</div>
+</body></html>`);
+    w.document.close();
+  };
 
   const filteredProducts = searchQ ? products.filter(p => p.name.toLowerCase().includes(searchQ.toLowerCase()) || p.sku?.includes(searchQ)) : products;
 
@@ -281,42 +377,91 @@ export default function AdminPage() {
         )}
 
         {/* ═══ ORDERS ═══ */}
-        {tab === "orders" && (
-          <div className="space-y-3">
-            {orders.length === 0 ? <div className="bg-white rounded-xl p-12 text-center text-warm-gray-400">Koi order nahi</div> : orders.map((o: any) => (
-              <div key={o.id} className="bg-white rounded-xl border overflow-hidden">
-                <div className="p-4 flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono font-bold text-sm">{o.trackingId || `#${o.id}`}</span>
-                      <select value={o.status} onChange={async (e) => { await fetch(`/api/admin/orders/${o.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({status:e.target.value})}); load(); }}
-                        className="text-[10px] border rounded px-1.5 py-0.5 bg-white">
-                        <option value="pending">⏳ Pending</option><option value="confirmed">✅ Confirmed</option>
-                        <option value="processing">📦 Processing</option><option value="shipped">🚚 Shipped</option>
-                        <option value="delivered">✓ Delivered</option><option value="cancelled">✕ Cancelled</option>
-                      </select>
-                    </div>
-                    <p className="text-sm font-medium">{o.customerName}</p>
-                    <p className="text-xs text-warm-gray-500">{o.customerPhone} · {o.shippingAddress}</p>
-                    <p className="text-[10px] text-warm-gray-400 mt-1">{o.items?.map((i: any, idx: number) => `${i.name} x${i.quantity}`).join(" · ")}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-lg">{formatPrice(o.total)}</p>
-                    <p className="text-[10px] text-warm-gray-400">{new Date(o.createdAt).toLocaleDateString("en-PK",{day:"numeric",month:"short"})}</p>
-                  </div>
-                </div>
-                <div className="flex border-t border-warm-gray-50 text-xs">
-                  <input type="text" placeholder="Courier" defaultValue={o.courierName||""} onBlur={async(e)=>{if(e.target.value!==(o.courierName||""))await fetch(`/api/admin/orders/${o.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({courierName:e.target.value})});load();}}
-                    className="flex-1 px-3 py-2 border-r border-warm-gray-50 outline-none"/>
-                  <input type="text" placeholder="Tracking #" defaultValue={o.courierTrackingId||""} onBlur={async(e)=>{if(e.target.value!==(o.courierTrackingId||""))await fetch(`/api/admin/orders/${o.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({courierTrackingId:e.target.value,courierName:o.courierName||"TCS"})});load();}}
-                    className="flex-1 px-3 py-2 border-r border-warm-gray-50 outline-none"/>
-                  {o.customerPhone && <a href={`https://wa.me/92${o.customerPhone.replace(/^0/,"")}`} target="_blank" rel="noopener noreferrer"
-                    className="px-4 py-2 text-green-600 hover:bg-green-50 font-medium flex items-center gap-1"><MessageCircle size={12}/> Notify</a>}
-                </div>
+        {tab === "orders" && (() => {
+          const totalRevenue = orders.reduce((s: number, o: any) => s + parseFloat(o.total || "0"), 0);
+          const filtered = orders.filter((o: any) => {
+            if (orderFilter !== "all" && o.status !== orderFilter) return false;
+            if (orderSearch) {
+              const q = orderSearch.toLowerCase();
+              return (o.trackingId||"").toLowerCase().includes(q) || (o.customerName||"").toLowerCase().includes(q) || (o.customerPhone||"").includes(q);
+            }
+            return true;
+          });
+          const exportCSV = () => {
+            const header = "Tracking ID,Customer,Phone,City,Total,Status,Date\n";
+            const rows = filtered.map((o: any) => `${o.trackingId},${o.customerName},${o.customerPhone||""},${o.shippingAddress},${o.total},${o.status},${new Date(o.createdAt).toLocaleDateString()}`).join("\n");
+            const blob = new Blob([header + rows], { type: "text/csv" });
+            const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "momis-orders.csv"; a.click();
+          };
+          return (
+          <div>
+            {/* Revenue Summary */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+              <div className="bg-white rounded-lg p-3 border text-center"><p className="text-lg font-bold text-green-600">{formatPrice(totalRevenue)}</p><p className="text-[9px] text-warm-gray-400 uppercase">Total Revenue</p></div>
+              <div className="bg-white rounded-lg p-3 border text-center"><p className="text-lg font-bold text-warm-gray-900">{orders.length}</p><p className="text-[9px] text-warm-gray-400 uppercase">Total Orders</p></div>
+              <div className="bg-white rounded-lg p-3 border text-center"><p className="text-lg font-bold text-amber-500">{orders.filter((o: any) => o.status === "pending").length}</p><p className="text-[9px] text-warm-gray-400 uppercase">Pending</p></div>
+              <div className="bg-white rounded-lg p-3 border text-center"><p className="text-lg font-bold text-green-500">{orders.filter((o: any) => o.status === "delivered").length}</p><p className="text-[9px] text-warm-gray-400 uppercase">Delivered</p></div>
+            </div>
+
+            {/* Search & Filter */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-4">
+              <div className="flex-1 flex items-center bg-white rounded-lg border px-3 gap-2">
+                <Search size={14} className="text-warm-gray-400"/>
+                <input value={orderSearch} onChange={e => setOrderSearch(e.target.value)} placeholder="Search by tracking ID, name, phone..."
+                  className="flex-1 py-2 text-sm outline-none"/>
               </div>
-            ))}
+              <select value={orderFilter} onChange={e => setOrderFilter(e.target.value)}
+                className="bg-white border rounded-lg px-3 py-2 text-sm">
+                <option value="all">All Status</option>
+                <option value="pending">⏳ Pending</option>
+                <option value="confirmed">✅ Confirmed</option>
+                <option value="shipped">🚚 Shipped</option>
+                <option value="delivered">✓ Delivered</option>
+                <option value="cancelled">✕ Cancelled</option>
+              </select>
+              <button onClick={exportCSV} className="bg-warm-gray-900 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-warm-gray-800">📥 Export CSV</button>
+            </div>
+
+            {/* Orders */}
+            <div className="space-y-3">
+              {filtered.length === 0 ? <div className="bg-white rounded-xl p-12 text-center text-warm-gray-400">Koi order nahi mila</div> : filtered.map((o: any) => (
+                <div key={o.id} className="bg-white rounded-xl border overflow-hidden">
+                  <div className="p-4 flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-mono font-bold text-sm">{o.trackingId || `#${o.id}`}</span>
+                        <select value={o.status} onChange={async (e) => { await fetch(`/api/admin/orders/${o.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({status:e.target.value})}); load(); }}
+                          className="text-[10px] border rounded px-1.5 py-0.5 bg-white">
+                          <option value="pending">⏳ Pending</option><option value="confirmed">✅ Confirmed</option>
+                          <option value="processing">📦 Processing</option><option value="shipped">🚚 Shipped</option>
+                          <option value="delivered">✓ Delivered</option><option value="cancelled">✕ Cancelled</option>
+                        </select>
+                        {o.referralCode && <span className="text-[9px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-mono">Ref: {o.referralCode}</span>}
+                      </div>
+                      <p className="text-sm font-medium">{o.customerName}</p>
+                      <p className="text-xs text-warm-gray-500">{o.customerPhone} · {o.shippingAddress}</p>
+                      <p className="text-[10px] text-warm-gray-400 mt-1">{o.items?.map((i: any) => `${i.name} x${i.quantity}`).join(" · ")}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-lg">{formatPrice(o.total)}</p>
+                      <p className="text-[10px] text-warm-gray-400">{new Date(o.createdAt).toLocaleDateString("en-PK",{day:"numeric",month:"short"})}</p>
+                    </div>
+                  </div>
+                  <div className="flex border-t border-warm-gray-50 text-xs">
+                    <input type="text" placeholder="Courier" defaultValue={o.courierName||""} onBlur={async(e)=>{if(e.target.value!==(o.courierName||""))await fetch(`/api/admin/orders/${o.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({courierName:e.target.value})});load();}}
+                      className="flex-1 px-3 py-2 border-r border-warm-gray-50 outline-none"/>
+                    <input type="text" placeholder="Tracking #" defaultValue={o.courierTrackingId||""} onBlur={async(e)=>{if(e.target.value!==(o.courierTrackingId||""))await fetch(`/api/admin/orders/${o.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({courierTrackingId:e.target.value,courierName:o.courierName||"TCS"})});load();}}
+                      className="flex-1 px-3 py-2 border-r border-warm-gray-50 outline-none"/>
+                    <button onClick={() => printInvoice(o)} className="px-3 py-2 text-warm-gray-600 hover:bg-warm-gray-50 font-medium flex items-center gap-1">📄 Invoice</button>
+                    {o.customerPhone && <a href={`https://wa.me/92${o.customerPhone.replace(/^0/,"")}`} target="_blank" rel="noopener noreferrer"
+                      className="px-3 py-2 text-green-600 hover:bg-green-50 font-medium flex items-center gap-1"><MessageCircle size={12}/> Notify</a>}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* ═══ CUSTOMERS ═══ */}
         {tab === "customers" && (
@@ -339,34 +484,77 @@ export default function AdminPage() {
 
         {/* ═══ TEAM ═══ */}
         {tab === "team" && (
-          <div className="bg-white rounded-xl border overflow-hidden">
-            <div className="px-4 py-3 bg-warm-gray-50 border-b font-bold text-sm">Team Members ({teamMembers.length})</div>
-            {teamMembers.map((m: any) => (
-              <div key={m.id} className="px-4 py-3 border-b border-warm-gray-50">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-sm">{m.name}</p>
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${m.active?"bg-green-100 text-green-700":"bg-warm-gray-200 text-warm-gray-500"}`}>{m.active?"Active":"Inactive"}</span>
+          <div className="space-y-3">
+            <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="px-4 py-3 bg-warm-gray-50 border-b font-bold text-sm">Team Members ({teamMembers.length})</div>
+              {teamMembers.length === 0 ? (
+                <div className="p-12 text-center text-warm-gray-400">Koi team member nahi</div>
+              ) : teamMembers.map((m: any) => (
+                <div key={m.id} className="p-4 border-b border-warm-gray-50">
+                  {/* Member Info */}
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm">{m.name}</p>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${m.active?"bg-green-100 text-green-700":"bg-warm-gray-200 text-warm-gray-500"}`}>{m.active?"Active":"Inactive"}</span>
+                      </div>
+                      <p className="text-xs text-warm-gray-500 mt-0.5">{m.phone} · {m.city||"—"} · Code: <span className="font-mono font-bold text-purple-600">{m.referralCode}</span></p>
+                      <div className="flex gap-3 mt-1 text-[11px]">
+                        <span className="text-green-600 font-semibold">{formatPrice(m.totalEarnings)}</span>
+                        <span className="text-warm-gray-500">{m.totalSales} sales</span>
+                        <span className="text-purple-500">{m.commissionPercent}%</span>
+                      </div>
                     </div>
-                    <p className="text-xs text-warm-gray-500">{m.phone} · {m.city||"—"} · Code: <span className="font-mono font-bold text-purple-600">{m.referralCode}</span></p>
-                    <div className="flex gap-3 mt-1 text-[11px]">
-                      <span className="text-green-600 font-semibold">{formatPrice(m.totalEarnings)}</span>
-                      <span className="text-warm-gray-500">{m.totalSales} sales</span>
-                      <span className="text-purple-500">{m.commissionPercent}%</span>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <a href={`https://wa.me/92${m.phone.replace(/^0/,"")}`} target="_blank" rel="noopener noreferrer" className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg"><MessageCircle size={16}/></a>
+                      <button onClick={async()=>{if(!confirm(`${m.name} ko delete karein?`))return;await fetch(`/api/admin/team/${m.id}`,{method:"DELETE"});load();}} className="p-1.5 text-warm-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={16}/></button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
+
+                  {/* Action Buttons — Properly Visible */}
+                  <div className="flex flex-wrap gap-2">
                     <button onClick={async()=>{await fetch(`/api/admin/team/${m.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({active:!m.active})});load();}}
-                      className="px-2 py-1 rounded text-[10px] font-medium bg-warm-gray-100 hover:bg-warm-gray-200">{m.active?"Deactivate":"Activate"}</button>
-                    <button onClick={async()=>{const p=prompt("Commission %:",String(m.commissionPercent));if(p){await fetch(`/api/admin/team/${m.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({commissionPercent:parseInt(p)})});load();}}}
-                      className="px-2 py-1 rounded text-[10px] font-medium bg-purple-50 text-purple-600 hover:bg-purple-100">Edit %</button>
-                    <a href={`https://wa.me/92${m.phone.replace(/^0/,"")}`} target="_blank" className="p-1 text-green-500 hover:bg-green-50 rounded"><MessageCircle size={14}/></a>
-                    <button onClick={async()=>{if(!confirm("Delete?"))return;await fetch(`/api/admin/team/${m.id}`,{method:"DELETE"});load();}} className="p-1 text-warm-gray-400 hover:text-rose-500 rounded"><Trash2 size={14}/></button>
+                      className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-warm-gray-100 hover:bg-warm-gray-200 transition-colors">
+                      {m.active?"⏸ Deactivate":"▶ Activate"}
+                    </button>
+                    <button onClick={async()=>{const p=prompt("Commission % set karein:",String(m.commissionPercent));if(p){await fetch(`/api/admin/team/${m.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({commissionPercent:parseInt(p)})});load();}}}
+                      className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors">
+                      💰 Commission {m.commissionPercent}%
+                    </button>
+
+                    {/* 🏆 CERTIFICATE — Big Visible Dropdown */}
+                    <select
+                      onChange={(e) => { if (e.target.value) { generateCertificate(m.name, e.target.value); e.target.selectedIndex = 0; } }}
+                      className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-amber-100 text-amber-800 hover:bg-amber-200 cursor-pointer border-0 appearance-auto transition-colors"
+                    >
+                      <option value="">🏆 Issue Certificate ▾</option>
+                      <option value="completion">📜 Training Completion Certificate</option>
+                      <option value="performance">⭐ Best Performance Certificate</option>
+                      <option value="appreciation">❤️ Appreciation Certificate</option>
+                      <option value="top_seller">🏅 Top Seller Award</option>
+                      <option value="rising_star">🚀 Rising Star Award</option>
+                    </select>
+
+                    {/* Training Control */}
+                    <button onClick={() => {
+                      const courses = ["WhatsApp Marketing", "Facebook Marketing", "Instagram Marketing", "TikTok Marketing", "Snapchat Marketing", "Complete Reselling Guide"];
+                      const msg = `Training assign for ${m.name}:\n\n${courses.map((c, i) => `${i+1}. ${c}`).join("\n")}\n\nKaunsa course assign karna hai? (number likhen)`;
+                      const choice = prompt(msg);
+                      if (choice) {
+                        const idx = parseInt(choice) - 1;
+                        if (idx >= 0 && idx < courses.length) {
+                          const whatsappMsg = `Assalam o Alaikum ${m.name}!\n\nAap ko "${courses[idx]}" training course assign kiya gaya hai.\n\n📚 Training shuru karein:\nmomis-wardrobe-vert.vercel.app/training/${["whatsapp","facebook","instagram","tiktok","snapchat","general"][idx]}\n\nCourse complete karne par certificate milega! 🏆\n\nMomis Wardrobe Team`;
+                          window.open(`https://wa.me/92${m.phone.replace(/^0/,"")}?text=${encodeURIComponent(whatsappMsg)}`, "_blank");
+                        }
+                      }
+                    }}
+                      className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors">
+                      📚 Assign Training
+                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
@@ -510,22 +698,38 @@ export default function AdminPage() {
                   </div>
                 )}
 
-                {/* Paste zone */}
-                <div className="border-2 border-dashed border-warm-gray-200 rounded-xl p-4 text-center hover:border-rose-300 transition-colors cursor-pointer"
-                  onClick={() => document.getElementById("img-url-input")?.focus()}>
-                  <Upload size={24} className="mx-auto text-warm-gray-300 mb-2"/>
-                  <p className="text-xs text-warm-gray-500 mb-1"><strong>Ctrl+V</strong> se image paste karein</p>
-                  <p className="text-[10px] text-warm-gray-400">Ya WhatsApp/browser se image copy karke yahan paste karein</p>
+                {/* Drop zone + File upload + Paste */}
+                <div
+                  className={`border-2 border-dashed rounded-xl p-5 text-center transition-colors cursor-pointer ${dragOver ? "border-rose-500 bg-rose-50" : "border-warm-gray-200 hover:border-rose-300"}`}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                  onClick={() => document.getElementById("file-input")?.click()}
+                >
+                  <Upload size={28} className={`mx-auto mb-2 ${dragOver ? "text-rose-500" : "text-warm-gray-300"}`}/>
+                  <p className="text-xs text-warm-gray-600 font-semibold mb-1">
+                    {dragOver ? "Drop Image Here!" : "Click to Upload ya Drag & Drop"}
+                  </p>
+                  <p className="text-[10px] text-warm-gray-400">Gallery, Files, WhatsApp image — sab support karta hai</p>
+                  <div className="flex flex-wrap justify-center gap-1.5 mt-3">
+                    <span className="text-[9px] bg-warm-gray-100 px-2 py-0.5 rounded">📁 Files</span>
+                    <span className="text-[9px] bg-warm-gray-100 px-2 py-0.5 rounded">📋 Ctrl+V Paste</span>
+                    <span className="text-[9px] bg-warm-gray-100 px-2 py-0.5 rounded">🖱️ Drag & Drop</span>
+                    <span className="text-[9px] bg-warm-gray-100 px-2 py-0.5 rounded">🔗 URL Link</span>
+                    <span className="text-[9px] bg-warm-gray-100 px-2 py-0.5 rounded">💬 WhatsApp</span>
+                  </div>
+                  <input id="file-input" type="file" accept="image/*" multiple onChange={handleFileSelect} className="hidden"/>
                 </div>
 
-                {/* URL input */}
+                {/* URL input — for Markaz, Daraz, Google, any link */}
                 <div className="flex gap-2 mt-2">
                   <input id="img-url-input" type="url" value={pasteUrl} onChange={e => setPasteUrl(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && addImageUrl()}
-                    placeholder="Image URL paste karein..." className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200"/>
+                    placeholder="Markaz / Daraz / Google image URL paste karein..." className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200"/>
                   <button onClick={addImageUrl} disabled={!pasteUrl.trim()}
-                    className="bg-warm-gray-900 text-white px-4 rounded-lg text-sm font-medium disabled:opacity-30">Add</button>
+                    className="bg-warm-gray-900 text-white px-4 rounded-lg text-sm font-medium disabled:opacity-30 hover:bg-warm-gray-800">Add</button>
                 </div>
+                <p className="text-[9px] text-warm-gray-400 mt-1">💡 Markaz/Daraz par image par right-click → "Copy Image Address" → yahan paste karein</p>
               </div>
 
               {/* Name & Price */}

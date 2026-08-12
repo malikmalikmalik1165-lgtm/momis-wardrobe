@@ -12,7 +12,8 @@ export default function AzadiSaleBanner() {
     if (d && Date.now() - parseInt(d) < 86400000) { setDismissed(true); return; }
 
     // Sale end: Aug 14 midnight
-    const end = new Date("2026-08-14T23:59:59").getTime();
+    // Extended till 31 August by popular demand!
+    const end = new Date("2026-08-31T23:59:59").getTime();
     const tick = () => {
       const diff = Math.max(0, end - Date.now());
       setTimeLeft({
@@ -35,7 +36,7 @@ export default function AzadiSaleBanner() {
       <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-center gap-3 sm:gap-6 relative z-10">
         <span className="text-lg">🇵🇰</span>
         <div className="flex items-center gap-2 sm:gap-4">
-          <span className="font-bold text-xs sm:text-sm tracking-wide uppercase">Azadi Sale!</span>
+          <span className="font-bold text-xs sm:text-sm tracking-wide uppercase">Azadi Sale Extended!</span>
           <div className="flex gap-1">
             {[
               { v: timeLeft.days, l: "D" },

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { formatPrice, FREE_SHIPPING_THRESHOLD } from "@/lib/currency";
 import { PAKISTAN_CITIES, getCityByName } from "@/lib/pakistan-cities";
+import { printInvoice } from "@/components/InvoiceView";
 
 export default function CheckoutPage() {
   const { items, subtotal, totalItems, clearCart } = useCartStore();
@@ -142,6 +143,18 @@ export default function CheckoutPage() {
           </div>
 
           <div className="flex flex-col gap-3 mb-6">
+            <button
+              onClick={() => printInvoice({
+                trackingId, customerName: form.firstName, customerPhone: form.phone,
+                shippingAddress: `${form.address}, ${form.area}, ${form.city}`,
+                items: items.length > 0 ? items.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })) : [],
+                subtotal: String(sub), shipping: String(shipping), total: String(total),
+                status: "pending", createdAt: new Date().toISOString(),
+              })}
+              className="flex items-center justify-center gap-2 bg-warm-gray-900 text-white py-3.5 rounded-xl font-semibold hover:bg-warm-gray-800 transition-colors"
+            >
+              📄 Download Invoice PDF
+            </button>
             <Link
               href={`/track?id=${trackingId}`}
               className="flex items-center justify-center gap-2 bg-rose-500 text-white py-3.5 rounded-xl font-semibold hover:bg-rose-600 transition-colors"
