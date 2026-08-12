@@ -126,7 +126,11 @@ th:nth-child(2){text-align:center}
 <p style="margin-top:4px">📞 03295578925 · 💬 WhatsApp · 🌐 momis-wardrobe-vert.vercel.app</p>
 <p style="margin-top:8px">Thank you for shopping with us! ❤️</p>
 </div>
-<div style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1c1917;color:white;border:none;padding:10px 30px;border-radius:8px;font-size:14px;cursor:pointer">🖨 Print / Save as PDF</button></div>
+<div style="text-align:center;margin-top:20px">
+<button onclick="window.print()" style="background:#1c1917;color:white;border:none;padding:14px 40px;border-radius:8px;font-size:15px;cursor:pointer;font-weight:bold">🖨 Save as PDF</button>
+<p style="font-size:11px;color:#a8a29e;margin-top:10px;font-family:sans-serif">👆 Click karein → Printer mein <b>"Save as PDF"</b> select karein → Save</p>
+<p style="font-size:10px;color:#d6d3d1;margin-top:4px;font-family:sans-serif">Mobile: Share icon → "Print" → "Save as PDF"</p>
+</div>
 </body></html>`);
   w.document.close();
 }

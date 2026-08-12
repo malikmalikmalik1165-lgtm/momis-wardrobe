@@ -1,15 +1,18 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import CartDrawer from "@/components/CartDrawer";
-import WhatsAppFloat from "@/components/WhatsAppFloat";
-import InstallPrompt from "@/components/InstallPrompt";
 import MobileNav from "@/components/MobileNav";
 import { ToastContainer } from "@/components/Toast";
 import AlertInterceptor from "@/components/AlertInterceptor";
-import AiChat from "@/components/AiChat";
+
+// Lazy load heavy components — website loads FAST
+const CartDrawer = dynamic(() => import("@/components/CartDrawer"), { ssr: false });
+const WhatsAppFloat = dynamic(() => import("@/components/WhatsAppFloat"), { ssr: false });
+const AiChat = dynamic(() => import("@/components/AiChat"), { ssr: false });
+const InstallPrompt = dynamic(() => import("@/components/InstallPrompt"), { ssr: false });
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

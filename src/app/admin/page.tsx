@@ -92,28 +92,48 @@ export default function AdminPage() {
     setShowAdd(true);
   };
 
+  const [saving, setSaving] = useState(false);
   const saveProd = async () => {
-    if (!pf.name || !pf.price) { alert("Name aur price daalein"); return; }
-    // Filter out base64 images that are too large (>500KB) — only keep URLs and small base64
-    const safeImages = pf.images.filter(img => {
-      if (img.startsWith("data:")) return img.length < 500000; // Skip huge base64
-      return true; // Keep URL images
-    });
-    const body = {
-      name: pf.name, price: pf.price, compareAtPrice: pf.comparePrice || null,
-      description: pf.desc || pf.name, images: safeImages,
-      sizes: pf.sizes ? pf.sizes.split(",").map(s => s.trim()).filter(Boolean) : [],
-      colors: pf.colors ? pf.colors.split(",").map(s => s.trim()).filter(Boolean) : [],
-      badge: pf.badge || null, categoryId: pf.catId ? parseInt(pf.catId) : null,
-      featured: pf.featured, inStock: pf.inStock,
-    };
+    if (!pf.name) { alert("Product name likhein"); return; }
+    if (!pf.price) { alert("Price daalein"); return; }
+    if (saving) return;
+    setSaving(true);
+    // Only keep URL images, skip large base64
+    const safeImages = pf.images.filter(img => !img.startsWith("data:") || img.length < 200000);
     try {
       const url = editId ? `/api/admin/products/${editId}` : "/api/admin/products";
       const method = editId ? "PUT" : "POST";
-      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (res.ok) { alert(editId ? "Updated!" : "Product add ho gaya!"); setShowAdd(false); resetPf(); load(); }
-      else { const err = await res.json().catch(() => ({})); alert(err.error || "Error aayi — check karein fields sahi hain"); }
-    } catch (e) { alert("Network error — internet check karein"); }
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: pf.name,
+          price: String(pf.price),
+          compareAtPrice: pf.comparePrice ? String(pf.comparePrice) : null,
+          description: pf.desc || pf.name,
+          images: safeImages,
+          sizes: pf.sizes ? pf.sizes.split(",").map(s => s.trim()).filter(Boolean) : [],
+          colors: pf.colors ? pf.colors.split(",").map(s => s.trim()).filter(Boolean) : [],
+          badge: pf.badge || null,
+          categoryId: pf.catId ? parseInt(pf.catId) : null,
+          featured: pf.featured,
+          inStock: pf.inStock,
+        }),
+      });
+      if (res.ok) {
+        setShowAdd(false);
+        resetPf();
+        load();
+        alert(editId ? "✅ Product updated!" : "✅ Product add ho gaya!");
+      } else {
+        const err = await res.json().catch(() => ({ error: "Server error" }));
+        alert("❌ " + (err.error || "Product add nahi hua — dobara try karein"));
+      }
+    } catch {
+      alert("❌ Network error — internet check karein");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const delProd = async (id: number) => { if (!confirm("Delete?")) return; await fetch(`/api/admin/products/${id}`, { method: "DELETE" }); load(); };
@@ -286,6 +306,7 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
           <h1 className="font-bold text-lg">Momis <span className="text-rose-500">Admin</span></h1>
           <div className="flex items-center gap-2">
             <a href="/admin/guide" className="text-[10px] bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg font-semibold hover:bg-blue-200">📖 Guide</a>
+            <a href="/admin/certificates" className="text-[10px] bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg font-semibold hover:bg-amber-200">🏆 Certs</a>
             <a href="/" target="_blank" className="text-xs text-warm-gray-500 hover:text-warm-gray-700 flex items-center gap-1"><Eye size={12}/> Store</a>
             <button onClick={() => load()} className="text-warm-gray-400 hover:text-warm-gray-600"><RefreshCw size={14}/></button>
             <button onClick={() => { localStorage.removeItem("momis-admin-auth"); setLoggedIn(false); }} className="text-xs text-rose-500">Logout</button>
@@ -817,8 +838,9 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
             {/* Footer */}
             <div className="p-5 border-t flex gap-3">
               <button onClick={() => setShowAdd(false)} className="flex-1 py-3 border rounded-lg text-sm font-medium text-warm-gray-600 hover:bg-warm-gray-50">Cancel</button>
-              <button onClick={saveProd} className="flex-1 py-3 bg-rose-500 text-white rounded-lg text-sm font-bold hover:bg-rose-600 flex items-center justify-center gap-1.5">
-                <Save size={16}/> {editId ? "Update" : "Add Product"}
+              <button onClick={saveProd} disabled={saving}
+                className={`flex-1 py-3.5 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${saving ? "bg-warm-gray-400 cursor-wait" : "bg-rose-500 hover:bg-rose-600 active:scale-95"}`}>
+                {saving ? "⏳ Saving..." : <><Save size={16}/> {editId ? "Update" : "Add Product"}</>}
               </button>
             </div>
           </div>
