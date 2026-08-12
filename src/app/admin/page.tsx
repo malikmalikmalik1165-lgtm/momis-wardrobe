@@ -94,19 +94,26 @@ export default function AdminPage() {
 
   const saveProd = async () => {
     if (!pf.name || !pf.price) { alert("Name aur price daalein"); return; }
+    // Filter out base64 images that are too large (>500KB) — only keep URLs and small base64
+    const safeImages = pf.images.filter(img => {
+      if (img.startsWith("data:")) return img.length < 500000; // Skip huge base64
+      return true; // Keep URL images
+    });
     const body = {
       name: pf.name, price: pf.price, compareAtPrice: pf.comparePrice || null,
-      description: pf.desc || pf.name, images: pf.images,
+      description: pf.desc || pf.name, images: safeImages,
       sizes: pf.sizes ? pf.sizes.split(",").map(s => s.trim()).filter(Boolean) : [],
       colors: pf.colors ? pf.colors.split(",").map(s => s.trim()).filter(Boolean) : [],
       badge: pf.badge || null, categoryId: pf.catId ? parseInt(pf.catId) : null,
       featured: pf.featured, inStock: pf.inStock,
     };
-    const url = editId ? `/api/admin/products/${editId}` : "/api/admin/products";
-    const method = editId ? "PUT" : "POST";
-    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    if (res.ok) { alert(editId ? "Updated!" : "Product add ho gaya!"); setShowAdd(false); resetPf(); load(); }
-    else alert("Error aayi");
+    try {
+      const url = editId ? `/api/admin/products/${editId}` : "/api/admin/products";
+      const method = editId ? "PUT" : "POST";
+      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (res.ok) { alert(editId ? "Updated!" : "Product add ho gaya!"); setShowAdd(false); resetPf(); load(); }
+      else { const err = await res.json().catch(() => ({})); alert(err.error || "Error aayi — check karein fields sahi hain"); }
+    } catch (e) { alert("Network error — internet check karein"); }
   };
 
   const delProd = async (id: number) => { if (!confirm("Delete?")) return; await fetch(`/api/admin/products/${id}`, { method: "DELETE" }); load(); };
@@ -159,13 +166,22 @@ export default function AdminPage() {
 
   const removeImage = (idx: number) => setPf(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
 
-  // Certificate generator
-  const generateCertificate = (memberName: string, type: string) => {
+  // Certificate generator — EDITABLE
+  const generateCertificate = (memberName: string, type: string, customDate?: string) => {
+    // Ask for editable fields
+    const editName = prompt("Certificate par naam likhein:", memberName);
+    if (!editName) return;
+    const editDate = prompt("Date likhein:", customDate || new Date().toLocaleDateString("en-PK", { day: "numeric", month: "long", year: "numeric" }));
+    if (!editDate) return;
+    const customNote = prompt("Extra note (optional — blank chor sakte hain):", "");
+    memberName = editName;
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) return;
-    const date = new Date().toLocaleDateString("en-PK", { day: "numeric", month: "long", year: "numeric" });
+    const date = editDate;
     const certId = `MW-CERT-${Date.now().toString(36).toUpperCase()}`;
+    const noteHtml = customNote ? `<p style="font-size:12px;color:#57534e;margin-top:12px;font-style:italic">"${customNote}"</p>` : "";
     const titles: Record<string, { title: string; sub: string; color: string }> = {
+      welcome: { title: "Welcome Certificate", sub: "Official Team Member — Momis Wardrobe", color: "#0f766e" },
       completion: { title: "Certificate of Completion", sub: "Social Media Marketing Training", color: "#1e40af" },
       performance: { title: "Certificate of Excellence", sub: "Outstanding Sales Performance", color: "#065f46" },
       appreciation: { title: "Certificate of Appreciation", sub: "Dedicated Team Member", color: "#9f1239" },
@@ -211,7 +227,7 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
 <div class="sub">${cert.sub}</div>
 <div class="presented">This certificate is proudly presented to</div>
 <div class="name">${memberName}</div>
-<div class="desc">In recognition of exceptional dedication, professional excellence, and valuable contribution to Momis Wardrobe's mission of empowering women through fashion entrepreneurship in Pakistan.</div>
+<div class="desc">In recognition of exceptional dedication, professional excellence, and valuable contribution to Momis Wardrobe's mission of empowering women through fashion entrepreneurship in Pakistan.</div>${noteHtml}
 <div class="footer">
 <div class="sign-box">
 <div class="sign-line">
@@ -268,9 +284,10 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
       <div className="bg-white border-b sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="font-bold text-lg">Momis <span className="text-rose-500">Admin</span></h1>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <a href="/admin/guide" className="text-[10px] bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg font-semibold hover:bg-blue-200">📖 Guide</a>
             <a href="/" target="_blank" className="text-xs text-warm-gray-500 hover:text-warm-gray-700 flex items-center gap-1"><Eye size={12}/> Store</a>
-            <button onClick={() => load()} className="text-xs text-warm-gray-400 hover:text-warm-gray-600"><RefreshCw size={14}/></button>
+            <button onClick={() => load()} className="text-warm-gray-400 hover:text-warm-gray-600"><RefreshCw size={14}/></button>
             <button onClick={() => { localStorage.removeItem("momis-admin-auth"); setLoggedIn(false); }} className="text-xs text-rose-500">Logout</button>
           </div>
         </div>
@@ -528,6 +545,7 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
                       className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-amber-100 text-amber-800 hover:bg-amber-200 cursor-pointer border-0 appearance-auto transition-colors"
                     >
                       <option value="">🏆 Issue Certificate ▾</option>
+                      <option value="welcome">🎉 Welcome Certificate</option>
                       <option value="completion">📜 Training Completion Certificate</option>
                       <option value="performance">⭐ Best Performance Certificate</option>
                       <option value="appreciation">❤️ Appreciation Certificate</option>

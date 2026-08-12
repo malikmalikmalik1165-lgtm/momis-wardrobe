@@ -5,14 +5,10 @@ import Link from "next/link";
 
 export default function AzadiSaleBanner() {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, mins: 0, secs: 0 });
-  const [dismissed, setDismissed] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const d = localStorage.getItem("mw-sale-dismissed");
-    if (d && Date.now() - parseInt(d) < 86400000) { setDismissed(true); return; }
-
-    // Sale end: Aug 14 midnight
-    // Extended till 31 August by popular demand!
+    // Extended till 31 August by customer & team request!
     const end = new Date("2026-08-31T23:59:59").getTime();
     const tick = () => {
       const diff = Math.max(0, end - Date.now());
@@ -24,11 +20,12 @@ export default function AzadiSaleBanner() {
       });
     };
     tick();
+    setReady(true);
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
 
-  if (dismissed) return null;
+  if (!ready) return null;
 
   return (
     <div className="bg-gradient-to-r from-green-700 via-green-600 to-emerald-600 text-white relative overflow-hidden">
@@ -54,8 +51,7 @@ export default function AzadiSaleBanner() {
             Shop Sale →
           </Link>
         </div>
-        <button onClick={() => { setDismissed(true); localStorage.setItem("mw-sale-dismissed", String(Date.now())); }}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white text-lg leading-none">×</button>
+        <span className="hidden sm:inline text-[10px] text-green-200">Customer & team request par extended!</span>
       </div>
     </div>
   );

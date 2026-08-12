@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   Users, LogOut, Wallet, ShoppingBag, Copy, Check, TrendingUp, MessageCircle,
-  Share2, BookOpen, Gift, Eye, ExternalLink, Star, Phone, ArrowRight,
+  Share2, BookOpen, Gift, Eye, ExternalLink, Star, Phone, ArrowRight, Trash2,
   BarChart3, Target, Award, Zap, Clock, ChevronRight,
 } from "lucide-react";
 import { formatPrice } from "@/lib/currency";
@@ -162,9 +162,11 @@ export default function TeamPage() {
                 <p className="text-white/60 text-[10px]">{level}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <Link href="/" className="text-white/70 hover:text-white text-xs flex items-center gap-1"><Eye size={12} /> Store</Link>
-              <button onClick={logout} className="text-white/70 hover:text-white text-xs flex items-center gap-1"><LogOut size={12} /> Logout</button>
+              <button onClick={logout} className="text-white/70 hover:text-white text-xs flex items-center gap-1 bg-white/10 px-2 py-1 rounded"><LogOut size={12} /> Logout</button>
+              <button onClick={() => { if(confirm("Kya aap apna account permanently delete karna chahte hain? Ye action undo nahi ho sakta.")) { localStorage.removeItem("momis-team"); setMember(null); alert("Account logout ho gaya. Delete ke liye WhatsApp par request karein: 03295578925"); }}}
+                className="text-white/50 hover:text-rose-300 text-[10px] flex items-center gap-1"><Trash2 size={10} /> Delete</button>
             </div>
           </div>
 
