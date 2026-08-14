@@ -13,7 +13,7 @@ import { printInvoice } from "@/components/InvoiceView";
 interface Product { id: number; sku: string | null; name: string; slug: string; description: string; price: string; compareAtPrice: string | null; categoryId: number | null; images: string[]; sizes: string[]; colors: string[]; inStock: boolean; featured: boolean; badge: string | null; }
 interface Category { id: number; name: string; slug: string; description: string | null; image: string | null; }
 
-type Tab = "products" | "orders" | "customers" | "team" | "requests" | "discounts" | "notifications" | "settings";
+type Tab = "products" | "categories" | "orders" | "customers" | "team" | "requests" | "discounts" | "notifications" | "settings";
 
 export default function AdminPage() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -41,6 +41,11 @@ export default function AdminPage() {
 
   // Notification
   const [nf, setNf] = useState({ title: "", body: "", url: "" });
+
+  // Category management
+  const [showCatForm, setShowCatForm] = useState(false);
+  const [editCatId, setEditCatId] = useState<number | null>(null);
+  const [cf, setCf] = useState({ name: "", description: "", image: "" });
 
   // Discount
   const [df, setDf] = useState({ code: "", percent: "", maxUses: "" });
@@ -340,6 +345,7 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
         <div className="flex gap-1 bg-white rounded-lg p-1 shadow-sm">
           {([
             { k: "products", l: "📦 Products" },
+            { k: "categories", l: "📁 Categories" },
             { k: "orders", l: "🛒 Orders" },
             { k: "customers", l: "👤 Customers" },
             { k: "team", l: "👥 Team" },
@@ -410,6 +416,102 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ═══ CATEGORIES ═══ */}
+        {tab === "categories" && (
+          <div>
+            {/* Add/Edit Form */}
+            <div className="bg-white rounded-xl border p-4 mb-4">
+              <h3 className="font-bold text-sm mb-3">{editCatId ? "Edit Category" : "Add New Category"}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <input value={cf.name} onChange={e => setCf({...cf, name: e.target.value})}
+                  placeholder="Category Name *" className="border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                <input value={cf.description} onChange={e => setCf({...cf, description: e.target.value})}
+                  placeholder="Description (optional)" className="border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                <input value={cf.image} onChange={e => setCf({...cf, image: e.target.value})}
+                  placeholder="Image URL (optional)" className="border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button onClick={async () => {
+                  if (!cf.name.trim()) { alert("Category name likhein"); return; }
+                  try {
+                    const url = editCatId ? `/api/admin/categories/${editCatId}` : "/api/admin/categories";
+                    const method = editCatId ? "PUT" : "POST";
+                    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ name: cf.name, description: cf.description || null, image: cf.image || null }) });
+                    if (res.ok) {
+                      alert(editCatId ? "Category updated!" : "Category add ho gayi!");
+                      setCf({ name: "", description: "", image: "" }); setEditCatId(null); load();
+                    } else { const err = await res.json().catch(() => ({})); alert(err.error || "Error aayi"); }
+                  } catch { alert("Network error"); }
+                }} className="bg-rose-500 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-rose-600 transition-colors">
+                  {editCatId ? "Update" : "Add Category"}
+                </button>
+                {editCatId && (
+                  <button onClick={() => { setCf({ name: "", description: "", image: "" }); setEditCatId(null); }}
+                    className="px-4 py-2.5 border rounded-lg text-sm text-warm-gray-600 hover:bg-warm-gray-50">Cancel</button>
+                )}
+              </div>
+            </div>
+
+            {/* Categories List */}
+            <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="px-4 py-3 bg-warm-gray-50 border-b font-bold text-sm flex items-center justify-between">
+                <span>Categories ({categories.length})</span>
+              </div>
+              {categories.length === 0 ? (
+                <div className="p-12 text-center text-warm-gray-400">Koi category nahi hai — upar se add karein</div>
+              ) : (
+                <div className="divide-y divide-warm-gray-50">
+                  {categories.map((cat) => {
+                    const productCount = products.filter(p => p.categoryId === cat.id).length;
+                    return (
+                      <div key={cat.id} className="p-4 flex items-center gap-4">
+                        {/* Category Image */}
+                        {cat.image ? (
+                          <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-warm-gray-100 flex-shrink-0">
+                            <Image src={cat.image} alt={cat.name} fill className="object-cover" sizes="56px" />
+                          </div>
+                        ) : (
+                          <div className="w-14 h-14 rounded-lg bg-warm-gray-100 flex items-center justify-center flex-shrink-0">
+                            <FolderOpen size={20} className="text-warm-gray-300" />
+                          </div>
+                        )}
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-sm text-warm-gray-900">{cat.name}</p>
+                            <span className="text-[9px] font-mono bg-warm-gray-100 text-warm-gray-500 px-1.5 py-0.5 rounded">{cat.slug}</span>
+                          </div>
+                          {cat.description && <p className="text-xs text-warm-gray-500 mt-0.5 truncate">{cat.description}</p>}
+                          <p className="text-[10px] text-warm-gray-400 mt-0.5">{productCount} product{productCount !== 1 ? "s" : ""}</p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-1.5 flex-shrink-0">
+                          <button onClick={() => { setEditCatId(cat.id); setCf({ name: cat.name, description: cat.description || "", image: cat.image || "" }); }}
+                            className="p-2 text-warm-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"><Pencil size={16} /></button>
+                          <button onClick={async () => {
+                            if (productCount > 0) {
+                              alert(`"${cat.name}" mein ${productCount} product(s) hain. Pehle products ko doosri category mein move karein ya unassign karein.`);
+                              return;
+                            }
+                            if (!confirm(`"${cat.name}" category delete karein?`)) return;
+                            try {
+                              await fetch(`/api/admin/categories/${cat.id}`, { method: "DELETE" });
+                              load();
+                            } catch { alert("Delete nahi ho saki"); }
+                          }} className="p-2 text-warm-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}

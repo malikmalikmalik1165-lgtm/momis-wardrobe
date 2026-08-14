@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, Award, Truck, Users, Star, MessageCircle, ArrowRight } from "lucide-react";
+import { Heart, Award, Truck, Users, MessageCircle, ArrowRight } from "lucide-react";
 
 export default function AboutPage() {
   return (
@@ -113,75 +113,6 @@ export default function AboutPage() {
               </div>
             ))}
           </div>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="bg-gradient-to-r from-rose-500 to-pink-600 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center">
-            {[
-              { number: "5000+", label: "Happy Customers" },
-              { number: "500+", label: "Products" },
-              { number: "100+", label: "Cities Covered" },
-              { number: "4.8", label: "Average Rating ⭐" },
-            ].map((stat) => (
-              <div key={stat.label}>
-                <p className="text-4xl sm:text-5xl font-bold mb-2">{stat.number}</p>
-                <p className="text-rose-200 text-sm">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Reviews */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
-        <div className="text-center mb-12">
-          <h2
-            className="font-serif text-3xl text-warm-gray-900"
-            style={{ fontFamily: "'Playfair Display', serif" }}
-          >
-            Customer Reviews
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[
-            {
-              name: "Fatima A.",
-              city: "Lahore",
-              text: "Best quality products milte hain yahan! Maine 3 dresses li aur sab amazing hain. Highly recommended!",
-            },
-            {
-              name: "Ayesha K.",
-              city: "Karachi",
-              text: "COD available hai jo bohot convenient hai. Packaging bhi premium thi. Will order again! ❤️",
-            },
-            {
-              name: "Sana M.",
-              city: "Islamabad",
-              text: "WhatsApp par bohot helpful hain. Meri sizing mein confusion thi, unhon ne guide kiya. Perfect fit aayi!",
-            },
-          ].map((review) => (
-            <div key={review.name} className="bg-warm-gray-50 rounded-2xl p-6">
-              <div className="flex gap-1 mb-3">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Star key={i} size={16} className="fill-gold-400 text-gold-400" />
-                ))}
-              </div>
-              <p className="text-warm-gray-600 text-sm mb-4 italic">&ldquo;{review.text}&rdquo;</p>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center text-rose-600 font-semibold text-sm">
-                  {review.name[0]}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-warm-gray-900">{review.name}</p>
-                  <p className="text-xs text-warm-gray-400">{review.city}</p>
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
 

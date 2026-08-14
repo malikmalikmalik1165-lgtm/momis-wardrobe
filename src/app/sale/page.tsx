@@ -5,12 +5,17 @@ import ProductCard from "@/components/ProductCard";
 import Link from "next/link";
 import { Sparkles, Clock, Percent } from "lucide-react";
 
-export const dynamic = "force-dynamic";
+// Revalidate every 60 seconds instead of force-dynamic
+export const revalidate = 60;
 
 async function getSaleProducts() {
-  // Get products with compareAtPrice (on sale)
+  // Only select columns needed for ProductCard
   const saleProducts = await db
-    .select()
+    .select({
+      id: products.id, name: products.name, slug: products.slug, price: products.price,
+      compareAtPrice: products.compareAtPrice, images: products.images, badge: products.badge,
+      colors: products.colors,
+    })
     .from(products)
     .where(isNotNull(products.compareAtPrice))
     .orderBy(desc(products.createdAt));

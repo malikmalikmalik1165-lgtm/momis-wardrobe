@@ -3,7 +3,8 @@ import { products, reviews, categories } from "@/db/schema";
 import { eq, desc, asc, sql, and, ilike, inArray } from "drizzle-orm";
 import ShopClient from "./ShopClient";
 
-export const dynamic = "force-dynamic";
+// Revalidate every 60 seconds instead of force-dynamic
+export const revalidate = 60;
 
 interface Props {
   searchParams: Promise<{
@@ -18,15 +19,17 @@ async function getData(searchParams: {
   sort?: string;
   search?: string;
 }) {
-  const allCategories = await db.select().from(categories);
+  // Only fetch needed category columns
+  const allCategories = await db.select({
+    id: categories.id, name: categories.name, slug: categories.slug,
+    description: categories.description, image: categories.image,
+  }).from(categories);
 
   const conditions = [];
 
   if (searchParams.category) {
     const cat = allCategories.find((c) => c.slug === searchParams.category);
-    if (cat) {
-      conditions.push(eq(products.categoryId, cat.id));
-    }
+    if (cat) conditions.push(eq(products.categoryId, cat.id));
   }
 
   if (searchParams.search) {
@@ -36,49 +39,34 @@ async function getData(searchParams: {
   const sort = searchParams.sort || "newest";
   let orderBy;
   switch (sort) {
-    case "price-asc":
-      orderBy = asc(sql`CAST(${products.price} AS DECIMAL)`);
-      break;
-    case "price-desc":
-      orderBy = desc(sql`CAST(${products.price} AS DECIMAL)`);
-      break;
-    case "name":
-      orderBy = asc(products.name);
-      break;
-    default:
-      orderBy = desc(products.createdAt);
+    case "price-asc": orderBy = asc(sql`CAST(${products.price} AS DECIMAL)`); break;
+    case "price-desc": orderBy = desc(sql`CAST(${products.price} AS DECIMAL)`); break;
+    case "name": orderBy = asc(products.name); break;
+    default: orderBy = desc(products.createdAt);
   }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const productList = await db
-    .select()
-    .from(products)
-    .where(where)
-    .orderBy(orderBy);
+  // Only select columns needed for ProductCard
+  const productList = await db.select({
+    id: products.id, name: products.name, slug: products.slug, price: products.price,
+    compareAtPrice: products.compareAtPrice, images: products.images, badge: products.badge,
+    colors: products.colors, sizes: products.sizes, inStock: products.inStock,
+    featured: products.featured, categoryId: products.categoryId,
+  }).from(products).where(where).orderBy(orderBy);
 
   const productIds = productList.map((p) => p.id);
   let reviewStats: { productId: number; avg: string; count: string }[] = [];
 
   if (productIds.length > 0) {
-    reviewStats = await db
-      .select({
-        productId: reviews.productId,
-        avg: sql<string>`ROUND(AVG(${reviews.rating})::numeric, 1)`,
-        count: sql<string>`COUNT(*)`,
-      })
-      .from(reviews)
-      .where(inArray(reviews.productId, productIds))
-      .groupBy(reviews.productId);
+    reviewStats = await db.select({
+      productId: reviews.productId,
+      avg: sql<string>`ROUND(AVG(${reviews.rating})::numeric, 1)`,
+      count: sql<string>`COUNT(*)`,
+    }).from(reviews).where(inArray(reviews.productId, productIds)).groupBy(reviews.productId);
   }
 
-  const statsMap = new Map(
-    reviewStats.map((s) => [
-      s.productId,
-      { avg: parseFloat(s.avg), count: parseInt(s.count) },
-    ])
-  );
-
+  const statsMap = new Map(reviewStats.map((s) => [s.productId, { avg: parseFloat(s.avg), count: parseInt(s.count) }]));
   const catMap = new Map(allCategories.map((c) => [c.id, c.name]));
 
   const enrichedProducts = productList.map((p) => ({

@@ -8,7 +8,6 @@ import {
   Clock,
   Smartphone,
   CheckCircle,
-  Star,
   MessageCircle,
   ArrowRight,
   Gift,
@@ -221,64 +220,6 @@ export default function JoinPage() {
                   {item.title}
                 </h3>
                 <p className="text-sm text-warm-gray-500">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="bg-white py-16 sm:py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <h2
-              className="font-serif text-2xl sm:text-3xl text-warm-gray-900"
-              style={{ fontFamily: "'Playfair Display', serif" }}
-            >
-              Humari Team Members Ka Tajurba
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {[
-              {
-                name: "Ayesha K.",
-                city: "Lahore",
-                text: "Main ghar baithay 2 ghantay kaam karti hoon aur month mein 25,000+ kama leti hoon. Best decision!",
-              },
-              {
-                name: "Fatima S.",
-                city: "Karachi",
-                text: "Student hoon aur apna pocket money khud kama rahi hoon. No investment thi isliye try kiya.",
-              },
-              {
-                name: "Hira M.",
-                city: "Islamabad",
-                text: "Housewife hoon, bachon ko sambhalne ke saath saath earning bhi ho jati hai. Highly recommend!",
-              },
-            ].map((review) => (
-              <div
-                key={review.name}
-                className="bg-warm-gray-50 rounded-2xl p-6"
-              >
-                <div className="flex gap-1 mb-3">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star
-                      key={i}
-                      size={14}
-                      className="fill-gold-400 text-gold-400"
-                    />
-                  ))}
-                </div>
-                <p className="text-warm-gray-600 text-sm mb-4 italic">
-                  &ldquo;{review.text}&rdquo;
-                </p>
-                <div>
-                  <p className="font-medium text-warm-gray-900 text-sm">
-                    {review.name}
-                  </p>
-                  <p className="text-xs text-warm-gray-400">{review.city}</p>
-                </div>
               </div>
             ))}
           </div>

@@ -77,8 +77,8 @@ export async function GET(request: NextRequest) {
     ])
   );
 
-  // Get categories
-  const allCategories = await db.select().from(categories);
+  // Only fetch id and name for category mapping
+  const allCategories = await db.select({ id: categories.id, name: categories.name }).from(categories);
   const catMap = new Map(allCategories.map((c) => [c.id, c.name]));
 
   const enriched = productList.map((p) => ({

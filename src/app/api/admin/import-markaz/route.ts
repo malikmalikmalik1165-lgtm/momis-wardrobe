@@ -57,4 +57,7 @@ export async function POST() {
   return NextResponse.json({ success: true, marginAdded: IMPORT_MARGIN, inserted, updated, total: WOMENS_COLLECTION.length });
 }
 
-export async function GET() { return POST(); }
+// GET must NOT trigger imports — removed dangerous auto-write behavior
+export async function GET() {
+  return NextResponse.json({ error: "Use POST method from admin panel to import products" }, { status: 405 });
+}

@@ -6,14 +6,25 @@ import { eq, desc, sql, inArray } from "drizzle-orm";
 import ProductCard from "@/components/ProductCard";
 import AzadiSaleBanner from "@/components/AzadiSaleBanner";
 import ScrollingStrip from "@/components/ScrollingStrip";
-import { ArrowRight, Truck, Shield, RotateCcw, Banknote, Star, MessageCircle, Sparkles } from "lucide-react";
+import { ArrowRight, Truck, Shield, RotateCcw, Banknote, MessageCircle, Sparkles } from "lucide-react";
 
-export const dynamic = "force-dynamic";
+// Revalidate every 60 seconds instead of force-dynamic (saves ~95% DB calls)
+export const revalidate = 60;
 
 async function getData() {
-  const allCategories = await db.select().from(categories);
-  const featuredProducts = await db.select().from(products)
+  // Only select columns needed for category cards
+  const allCategories = await db.select({
+    id: categories.id, name: categories.name, slug: categories.slug, image: categories.image,
+  }).from(categories);
+
+  // Only select columns needed for ProductCard
+  const featuredProducts = await db.select({
+    id: products.id, name: products.name, slug: products.slug, price: products.price,
+    compareAtPrice: products.compareAtPrice, images: products.images, badge: products.badge,
+    colors: products.colors, featured: products.featured,
+  }).from(products)
     .where(eq(products.featured, true)).orderBy(desc(products.createdAt)).limit(8);
+
   const productIds = featuredProducts.map((p) => p.id);
   let reviewStats: { productId: number; avg: string; count: string }[] = [];
   if (productIds.length > 0) {
@@ -24,19 +35,23 @@ async function getData() {
     }).from(reviews).where(inArray(reviews.productId, productIds)).groupBy(reviews.productId);
   }
   const statsMap = new Map(reviewStats.map((s) => [s.productId, { avg: parseFloat(s.avg), count: parseInt(s.count) }]));
+
+  // Scrolling strip — only need minimal fields
+  const stripProducts = await db.select({
+    id: products.id, slug: products.slug, name: products.name, images: products.images, price: products.price,
+  }).from(products).orderBy(desc(products.createdAt)).limit(16);
+
   return {
     categories: allCategories,
     featuredProducts: featuredProducts.map((p) => ({
       ...p, averageRating: statsMap.get(p.id)?.avg || 0, reviewCount: statsMap.get(p.id)?.count || 0,
     })),
+    stripProducts,
   };
 }
 
 export default async function HomePage() {
-  const { categories: cats, featuredProducts } = await getData();
-
-  // Get all products for scrolling strip
-  const allProducts = await db.select().from(products).orderBy(desc(products.createdAt)).limit(16);
+  const { categories: cats, featuredProducts, stripProducts } = await getData();
 
   return (
     <div className="pt-[calc(2rem+3.5rem)] sm:pt-[calc(2rem+5.5rem)]">
@@ -103,7 +118,7 @@ export default async function HomePage() {
       </section>
 
       {/* ══════ SCROLLING STRIP ══════ */}
-      <ScrollingStrip products={allProducts} />
+      <ScrollingStrip products={stripProducts} />
 
       {/* ══════ CATEGORIES ══════ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
@@ -170,51 +185,9 @@ export default async function HomePage() {
             <p className="text-warm-gray-500 leading-relaxed mb-8 text-[15px]">
               Chahe aap unstitched lawn dhoondhein ya ready-to-wear — humara curated collection aap ke liye hai. Ab ghar baithay shopping karein!
             </p>
-
-            <div className="grid grid-cols-3 gap-3 mb-8">
-              {[{ n: "5K+", l: "Customers" }, { n: "500+", l: "Products" }, { n: "4.8★", l: "Rating" }].map((s) => (
-                <div key={s.l} className="bg-warm-gray-50 rounded-xl p-3 text-center">
-                  <p className="text-lg font-bold text-warm-gray-900">{s.n}</p>
-                  <p className="text-[9px] text-warm-gray-400 uppercase tracking-wider">{s.l}</p>
-                </div>
-              ))}
-            </div>
-
             <Link href="/shop" className="inline-flex items-center gap-2 bg-warm-gray-900 text-white px-7 py-3.5 text-sm font-semibold uppercase tracking-wide hover:bg-warm-gray-800 transition-colors">
               Shop Now <ArrowRight size={14}/>
             </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ══════ REVIEWS ══════ */}
-      <section className="bg-warm-gray-900 py-14 sm:py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-10">
-            <p className="text-rose-400 text-[11px] tracking-[.25em] uppercase font-medium">Testimonials</p>
-            <h2 className="text-2xl sm:text-3xl text-white mt-1.5" style={{ fontFamily: "'Playfair Display', serif" }}>
-              Loved by <em className="text-rose-300">Thousands</em>
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {[
-              { name: "Fatima A.", city: "Lahore", text: "Best quality! 3 suits liye, sab amazing. Fabric bohot soft hai. ❤️" },
-              { name: "Ayesha K.", city: "Karachi", text: "COD available — bohot convenient. Packaging premium thi. Will order again!" },
-              { name: "Sana M.", city: "Islamabad", text: "WhatsApp par size guide follow kiya, perfect fit aayi. Love it! 🥰" },
-            ].map((r) => (
-              <div key={r.name} className="bg-white/[.06] border border-white/10 rounded-2xl p-6">
-                <div className="flex gap-0.5 mb-3">{[1,2,3,4,5].map((i) => <Star key={i} size={13} className="fill-amber-400 text-amber-400"/>)}</div>
-                <p className="text-warm-gray-300 text-sm leading-relaxed mb-5 italic">&ldquo;{r.text}&rdquo;</p>
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 bg-rose-500/20 rounded-full flex items-center justify-center text-rose-300 font-bold text-xs">{r.name[0]}</div>
-                  <div>
-                    <p className="text-white text-sm font-medium">{r.name}</p>
-                    <p className="text-warm-gray-500 text-[10px]">{r.city} · Verified ✓</p>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>

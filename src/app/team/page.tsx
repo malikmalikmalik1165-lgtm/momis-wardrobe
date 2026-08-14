@@ -163,11 +163,21 @@ export default function TeamPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Link href="/" className="text-white/70 hover:text-white text-xs flex items-center gap-1"><Eye size={12} /> Store</Link>
-              <button onClick={logout} className="text-white/70 hover:text-white text-xs flex items-center gap-1 bg-white/10 px-2 py-1 rounded"><LogOut size={12} /> Logout</button>
-              <button onClick={() => { if(confirm("Kya aap apna account permanently delete karna chahte hain? Ye action undo nahi ho sakta.")) { localStorage.removeItem("momis-team"); setMember(null); alert("Account logout ho gaya. Delete ke liye WhatsApp par request karein: 03295578925"); }}}
-                className="text-white/50 hover:text-rose-300 text-[10px] flex items-center gap-1"><Trash2 size={10} /> Delete</button>
+              <button onClick={logout}
+                className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5 transition-colors">
+                <LogOut size={16} /> Logout
+              </button>
             </div>
+          </div>
+          {/* Account Actions — VISIBLE */}
+          <div className="flex gap-2 mb-4">
+            <Link href="/" className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors">
+              <Eye size={14} /> Visit Store
+            </Link>
+            <button onClick={() => { if(confirm("Account delete karna chahte hain?")) { localStorage.removeItem("momis-team"); setMember(null); alert("Logout ho gaye. Permanent delete ke liye WhatsApp: 03295578925"); }}}
+              className="bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 px-4 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors">
+              <Trash2 size={14} /> Delete Account
+            </button>
           </div>
 
           {/* Stats Row */}
