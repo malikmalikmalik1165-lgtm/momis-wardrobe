@@ -26,6 +26,9 @@ yarn-error.log*
 *.pem
 .vercel
 
+# Local-only dev database
+.local-pg/
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
