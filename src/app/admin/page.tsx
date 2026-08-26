@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
+import * as XLSX from "xlsx";
 import {
   Plus, Pencil, Trash2, Package, Users, X, Save, LogIn, FolderOpen,
   ShoppingCart, Settings, Eye, MessageCircle, Percent, ToggleLeft, ToggleRight,
@@ -38,6 +39,9 @@ export default function AdminPage() {
   const [pf, setPf] = useState({ name: "", price: "", comparePrice: "", desc: "", images: [] as string[], sizes: "", colors: "", badge: "", catId: "", featured: true, inStock: true });
   const [dragOver, setDragOver] = useState(false);
   const [pasteUrl, setPasteUrl] = useState("");
+
+  // Excel bulk import
+  const [importing, setImporting] = useState(false);
 
   // Notification
   const [nf, setNf] = useState({ title: "", body: "", url: "" });
@@ -190,6 +194,52 @@ export default function AdminPage() {
   };
 
   const removeImage = (idx: number) => setPf(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
+
+  // Excel bulk import
+  const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+      const mapped = rows.map((r) => ({
+        name: r.Name,
+        price: r.Price,
+        comparePrice: r.ComparePrice,
+        description: r.Description,
+        category: r.Category,
+        sizes: r.Sizes,
+        colors: r.Colors,
+        images: r.Images,
+        badge: r.Badge,
+        featured: r.Featured,
+        inStock: r.InStock,
+        sku: r.SKU,
+      }));
+
+      const res = await fetch("/api/admin/products/bulk-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ products: mapped }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`✅ ${data.inserted} products add ho gaye!${data.skipped ? `\n⚠️ ${data.skipped} skip hue.` : ""}${data.errors?.length ? "\n\n" + data.errors.slice(0, 5).join("\n") : ""}`);
+        load();
+      } else {
+        alert("❌ " + (data.error || "Import fail ho gaya"));
+      }
+    } catch {
+      alert("❌ Excel file parse nahi ho saki — sahi format check karein");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   // Certificate generator — EDITABLE
   const generateCertificate = (memberName: string, type: string, customDate?: string) => {
@@ -378,6 +428,10 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
               <button onClick={openAdd} className="bg-rose-500 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-rose-600 flex items-center justify-center gap-1.5">
                 <Plus size={16}/> Add Product
               </button>
+              <label className={`px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${importing ? "bg-warm-gray-300 text-warm-gray-500" : "bg-emerald-600 text-white hover:bg-emerald-700"}`}>
+                {importing ? "⏳ Importing..." : <>📥 Import Excel</>}
+                <input type="file" accept=".xlsx,.xls" onChange={handleExcelImport} disabled={importing} className="hidden" />
+              </label>
               <button onClick={async () => { const r = await fetch("/api/admin/import-markaz",{method:"POST"}); const d = await r.json(); if(d.success) { alert(`${d.inserted} new, ${d.updated} updated!`); load(); } }}
                 className="bg-purple-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-purple-700 flex items-center justify-center gap-1.5">
                 ✨ Import Collection
