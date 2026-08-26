@@ -7,12 +7,42 @@ import {
   Plus, Pencil, Trash2, Package, Users, X, Save, LogIn, FolderOpen,
   ShoppingCart, Settings, Eye, MessageCircle, Percent, ToggleLeft, ToggleRight,
   Upload, Copy, Check, Search, Image as ImageIcon, Bell, RefreshCw,
+  FileSpreadsheet, Download,
 } from "lucide-react";
 import { formatPrice } from "@/lib/currency";
 import { printInvoice } from "@/components/InvoiceView";
 
 interface Product { id: number; sku: string | null; name: string; slug: string; description: string; price: string; compareAtPrice: string | null; categoryId: number | null; images: string[]; sizes: string[]; colors: string[]; inStock: boolean; featured: boolean; badge: string | null; }
 interface Category { id: number; name: string; slug: string; description: string | null; image: string | null; }
+
+interface MappedImportRow {
+  name: string;
+  price: string;
+  ok: boolean;
+  reason: string;
+  payload: {
+    name: string; price: string; comparePrice: string; description: string; category: string;
+    sizes: string; colors: string; images: string; badge: string; featured: string; inStock: string; sku: string;
+  };
+}
+
+// Header names Excel mein likhe gaye ho (kisi bhi case/spelling se) -> standard field
+const IMPORT_HEADER_MAP: Record<string, string> = {
+  name: "name", productname: "name",
+  price: "price",
+  compareprice: "comparePrice", compareatprice: "comparePrice",
+  description: "description",
+  category: "category",
+  sizes: "sizes", size: "sizes",
+  colors: "colors", color: "colors",
+  images: "images", image: "images", imageurls: "images",
+  badge: "badge",
+  featured: "featured",
+  instock: "inStock", stock: "inStock",
+  sku: "sku",
+};
+
+const normImportHeader = (h: unknown) => String(h ?? "").trim().toLowerCase().replace(/[^a-z]/g, "");
 
 type Tab = "products" | "categories" | "orders" | "customers" | "team" | "requests" | "discounts" | "notifications" | "settings";
 
@@ -42,6 +72,12 @@ export default function AdminPage() {
 
   // Excel bulk import
   const [importing, setImporting] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importRows, setImportRows] = useState<MappedImportRow[]>([]);
+  const [importParseErrors, setImportParseErrors] = useState<string[]>([]);
+  const [importResult, setImportResult] = useState<{ inserted: number; skipped: number; errors: string[] } | null>(null);
+  const [importDrag, setImportDrag] = useState(false);
 
   // Notification
   const [nf, setNf] = useState({ title: "", body: "", url: "" });
@@ -195,50 +231,111 @@ export default function AdminPage() {
 
   const removeImage = (idx: number) => setPf(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
 
-  // Excel bulk import
-  const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
+  // ===== Excel bulk import =====
+  const closeImport = () => {
+    setShowImport(false);
+    setImportFile(null);
+    setImportRows([]);
+    setImportParseErrors([]);
+    setImportResult(null);
+    setImportDrag(false);
+  };
+
+  const handleImportFile = async (file: File | null | undefined) => {
     if (!file) return;
-    setImporting(true);
+    setImportParseErrors([]);
+    setImportRows([]);
+    setImportResult(null);
     try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
+      let wb: XLSX.WorkBook;
+      if (file.name.toLowerCase().endsWith(".csv")) {
+        wb = XLSX.read(await file.text(), { type: "string" });
+      } else {
+        wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      }
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      if (rows.length === 0) {
+        setImportParseErrors(["File mein koi data row nahi mili — pehli row column headers honi chahiye (Download Template use karein)"]);
+        setImportFile(null);
+        return;
+      }
+      const get = (r: Record<string, unknown>, field: string): unknown => {
+        for (const key of Object.keys(r)) {
+          if (IMPORT_HEADER_MAP[normImportHeader(key)] === field) return r[key];
+        }
+        return "";
+      };
+      const str = (v: unknown) => String(v ?? "").trim();
+      const mapped: MappedImportRow[] = rows.map((r) => {
+        const name = str(get(r, "name"));
+        const price = str(get(r, "price"));
+        let reason = "";
+        if (!name) reason = "Name missing";
+        else if (!price) reason = "Price missing";
+        return {
+          name,
+          price,
+          ok: !reason,
+          reason,
+          payload: {
+            name,
+            price,
+            comparePrice: str(get(r, "comparePrice")),
+            description: str(get(r, "description")),
+            category: str(get(r, "category")),
+            sizes: str(get(r, "sizes")),
+            colors: str(get(r, "colors")),
+            images: str(get(r, "images")),
+            badge: str(get(r, "badge")),
+            featured: str(get(r, "featured")),
+            inStock: str(get(r, "inStock")),
+            sku: str(get(r, "sku")),
+          },
+        };
+      });
+      setImportFile(file);
+      setImportRows(mapped);
+    } catch {
+      setImportFile(null);
+      setImportParseErrors(["File parse nahi ho saki — sahi Excel file select karein (.xlsx, .xls ya .csv)"]);
+    }
+  };
 
-      const mapped = rows.map((r) => ({
-        name: r.Name,
-        price: r.Price,
-        comparePrice: r.ComparePrice,
-        description: r.Description,
-        category: r.Category,
-        sizes: r.Sizes,
-        colors: r.Colors,
-        images: r.Images,
-        badge: r.Badge,
-        featured: r.Featured,
-        inStock: r.InStock,
-        sku: r.SKU,
-      }));
-
+  const doImport = async () => {
+    if (!importRows.length || importing) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
       const res = await fetch("/api/admin/products/bulk-import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ products: mapped }),
+        body: JSON.stringify({ products: importRows.map((r) => r.payload) }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        alert(`✅ ${data.inserted} products add ho gaye!${data.skipped ? `\n⚠️ ${data.skipped} skip hue.` : ""}${data.errors?.length ? "\n\n" + data.errors.slice(0, 5).join("\n") : ""}`);
-        load();
+        setImportResult({ inserted: data.inserted || 0, skipped: data.skipped || 0, errors: data.errors || [] });
+        if (data.inserted > 0) load();
       } else {
-        alert("❌ " + (data.error || "Import fail ho gaya"));
+        setImportResult({ inserted: 0, skipped: importRows.length, errors: [data.error || "Import fail ho gaya — server error"] });
       }
     } catch {
-      alert("❌ Excel file parse nahi ho saki — sahi format check karein");
+      setImportResult({ inserted: 0, skipped: importRows.length, errors: ["Network error — internet check karein"] });
     } finally {
       setImporting(false);
     }
+  };
+
+  const downloadImportTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["Name", "Price", "ComparePrice", "Category", "Description", "Sizes", "Colors", "Images", "Badge", "Featured", "InStock", "SKU"],
+      ["Embroidered Chiffon 3-Piece Suit", "3500", "4500", "Suits", "Premium embroidered chiffon unstitched suit", "S, M, L, XL", "Black, Maroon", "https://example.com/image1.jpg, https://example.com/image2.jpg", "New", "Yes", "Yes", ""],
+      ["Cotton Lawn Unstitched 3-Piece", "2200", "", "Lawn", "Summer cotton lawn suit with dupatta", "Free Size", "Pink, White", "https://example.com/image3.jpg", "Sale", "", "Yes", ""],
+    ]);
+    ws["!cols"] = [{ wch: 32 }, { wch: 8 }, { wch: 13 }, { wch: 12 }, { wch: 32 }, { wch: 16 }, { wch: 14 }, { wch: 44 }, { wch: 10 }, { wch: 9 }, { wch: 8 }, { wch: 10 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Products");
+    XLSX.writeFile(wb, "momis-products-template.xlsx");
   };
 
   // Certificate generator — EDITABLE
@@ -428,10 +525,10 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
               <button onClick={openAdd} className="bg-rose-500 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-rose-600 flex items-center justify-center gap-1.5">
                 <Plus size={16}/> Add Product
               </button>
-              <label className={`px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${importing ? "bg-warm-gray-300 text-warm-gray-500" : "bg-emerald-600 text-white hover:bg-emerald-700"}`}>
-                {importing ? "⏳ Importing..." : <>📥 Import Excel</>}
-                <input type="file" accept=".xlsx,.xls" onChange={handleExcelImport} disabled={importing} className="hidden" />
-              </label>
+              <button onClick={() => setShowImport(true)}
+                className="bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-700 flex items-center justify-center gap-1.5">
+                <FileSpreadsheet size={16}/> Import Excel
+              </button>
               <button onClick={async () => { const r = await fetch("/api/admin/import-markaz",{method:"POST"}); const d = await r.json(); if(d.success) { alert(`${d.inserted} new, ${d.updated} updated!`); load(); } }}
                 className="bg-purple-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-purple-700 flex items-center justify-center gap-1.5">
                 ✨ Import Collection
@@ -998,6 +1095,149 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
                 className={`flex-1 py-3.5 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${saving ? "bg-warm-gray-400 cursor-wait" : "bg-rose-500 hover:bg-rose-600 active:scale-95"}`}>
                 {saving ? "⏳ Saving..." : <><Save size={16}/> {editId ? "Update" : "Add Product"}</>}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ EXCEL IMPORT MODAL ═══ */}
+      {showImport && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-3xl my-8 shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b">
+              <h2 className="font-bold text-lg">📥 Excel Import — Products</h2>
+              <button onClick={closeImport} className="p-1.5 hover:bg-warm-gray-100 rounded-full"><X size={18}/></button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Format guide */}
+              <div className="bg-warm-gray-50 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-bold text-warm-gray-700">📋 Excel Format — pehle template download karein</p>
+                  <button onClick={downloadImportTemplate} className="text-[11px] bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-emerald-700 flex items-center gap-1">
+                    <Download size={12}/> Download Template
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="text-[10px] bg-rose-100 text-rose-700 px-2 py-1 rounded font-semibold">Name *</span>
+                  <span className="text-[10px] bg-rose-100 text-rose-700 px-2 py-1 rounded font-semibold">Price *</span>
+                  <span className="text-[10px] bg-warm-gray-100 text-warm-gray-600 px-2 py-1 rounded">ComparePrice</span>
+                  <span className="text-[10px] bg-warm-gray-100 text-warm-gray-600 px-2 py-1 rounded">Category</span>
+                  <span className="text-[10px] bg-warm-gray-100 text-warm-gray-600 px-2 py-1 rounded">Description</span>
+                  <span className="text-[10px] bg-warm-gray-100 text-warm-gray-600 px-2 py-1 rounded">Sizes (comma)</span>
+                  <span className="text-[10px] bg-warm-gray-100 text-warm-gray-600 px-2 py-1 rounded">Colors (comma)</span>
+                  <span className="text-[10px] bg-warm-gray-100 text-warm-gray-600 px-2 py-1 rounded">Images (URLs, comma)</span>
+                  <span className="text-[10px] bg-warm-gray-100 text-warm-gray-600 px-2 py-1 rounded">Badge</span>
+                  <span className="text-[10px] bg-warm-gray-100 text-warm-gray-600 px-2 py-1 rounded">Featured (Yes/No)</span>
+                  <span className="text-[10px] bg-warm-gray-100 text-warm-gray-600 px-2 py-1 rounded">InStock (Yes/No)</span>
+                  <span className="text-[10px] bg-warm-gray-100 text-warm-gray-600 px-2 py-1 rounded">SKU (optional)</span>
+                </div>
+                <p className="text-[10px] text-warm-gray-500 mt-2">
+                  * = zaroori columns — bina Name/Price ke row skip ho jayegi. Naya category likhein to category auto-ban jayegi. SKU blank chhor dein to auto (MW-0001) banega. Multiple sizes/colors/images ko <b>comma (,)</b> se alag karein.
+                </p>
+              </div>
+
+              {/* Parse errors */}
+              {importParseErrors.length > 0 && (
+                <div className="bg-rose-50 border border-rose-200 rounded-xl p-3">
+                  {importParseErrors.map((e, i) => (<p key={i} className="text-xs text-rose-600">❌ {e}</p>))}
+                </div>
+              )}
+
+              {/* File picker */}
+              <div
+                className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer ${importDrag ? "border-emerald-500 bg-emerald-50" : "border-warm-gray-200 hover:border-emerald-400"}`}
+                onDragOver={(e) => { e.preventDefault(); setImportDrag(true); }}
+                onDragLeave={() => setImportDrag(false)}
+                onDrop={(e) => { e.preventDefault(); setImportDrag(false); handleImportFile(e.dataTransfer?.files?.[0]); }}
+                onClick={() => document.getElementById("excel-import-input")?.click()}
+              >
+                {importFile ? (
+                  <div className="flex flex-col items-center gap-1">
+                    <FileSpreadsheet size={28} className="text-emerald-500 mb-1"/>
+                    <p className="text-sm font-semibold text-warm-gray-800">{importFile.name}</p>
+                    <p className="text-[10px] text-warm-gray-400">File change karni ho to yahan click karke nayi file select karein</p>
+                  </div>
+                ) : (
+                  <>
+                    <FileSpreadsheet size={28} className="mx-auto mb-2 text-warm-gray-300"/>
+                    <p className="text-xs font-semibold text-warm-gray-700 mb-1">Excel file yahan drop karein ya click karke select karein</p>
+                    <p className="text-[10px] text-warm-gray-400">.xlsx · .xls · .csv — 100+ products ek hi file mein</p>
+                  </>
+                )}
+                <input id="excel-import-input" type="file" accept=".xlsx,.xls,.csv" className="hidden"
+                  onChange={(e) => { handleImportFile(e.target.files?.[0]); e.target.value = ""; }} />
+              </div>
+
+              {/* Preview */}
+              {importRows.length > 0 && (
+                <div>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className="text-xs font-bold text-warm-gray-700">Preview:</span>
+                    <span className="text-[10px] bg-warm-gray-100 px-2 py-1 rounded-full font-semibold">{importRows.length} rows</span>
+                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">✅ {importRows.filter((r) => r.ok).length} import hongi</span>
+                    {importRows.some((r) => !r.ok) && (
+                      <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-semibold">⚠️ {importRows.filter((r) => !r.ok).length} skip hongi</span>
+                    )}
+                  </div>
+                  <div className="border rounded-lg overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead className="bg-warm-gray-50 text-[9px] uppercase text-warm-gray-400">
+                        <tr>
+                          <th className="px-2 py-2">Row</th>
+                          <th className="px-2 py-2">Name</th>
+                          <th className="px-2 py-2">Price</th>
+                          <th className="px-2 py-2">Category</th>
+                          <th className="px-2 py-2">SKU</th>
+                          <th className="px-2 py-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-warm-gray-50">
+                        {importRows.slice(0, 8).map((r, i) => (
+                          <tr key={i} className={!r.ok ? "bg-amber-50/60" : ""}>
+                            <td className="px-2 py-1.5 text-[10px] font-mono text-warm-gray-400">{i + 2}</td>
+                            <td className="px-2 py-1.5 text-[11px] font-medium max-w-[160px] truncate">{r.name || "—"}</td>
+                            <td className="px-2 py-1.5 text-[11px]">{r.price || "—"}</td>
+                            <td className="px-2 py-1.5 text-[11px] text-warm-gray-500">{r.payload.category || "—"}</td>
+                            <td className="px-2 py-1.5 text-[10px] font-mono text-warm-gray-500">{r.payload.sku || "auto"}</td>
+                            <td className={`px-2 py-1.5 text-[10px] font-semibold ${r.ok ? "text-green-600" : "text-amber-600"}`}>{r.ok ? "✅ OK" : `⚠️ ${r.reason}`}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {importRows.length > 8 && <p className="text-[10px] text-warm-gray-400 px-2 py-1.5 bg-warm-gray-50">... aur {importRows.length - 8} rows (sab import mein shamil hongi)</p>}
+                  </div>
+                </div>
+              )}
+
+              {/* Result */}
+              {importResult && (
+                <div className={`rounded-xl p-4 border ${importResult.inserted > 0 ? "bg-green-50 border-green-200" : "bg-rose-50 border-rose-200"}`}>
+                  <p className={`text-sm font-bold mb-1 ${importResult.inserted > 0 ? "text-green-700" : "text-rose-700"}`}>
+                    {importResult.inserted > 0 ? `✅ ${importResult.inserted} products import ho gaye!` : "❌ Koi product add nahi hua"}
+                  </p>
+                  {importResult.skipped > 0 && <p className="text-xs text-amber-700 mb-1">⚠️ {importResult.skipped} rows skip hui (Name/Price missing ya save error)</p>}
+                  {importResult.errors.length > 0 && (
+                    <div className="mt-2 space-y-0.5 max-h-32 overflow-y-auto">
+                      {importResult.errors.slice(0, 10).map((e, i) => (<p key={i} className="text-[10px] text-warm-gray-500">• {e}</p>))}
+                      {importResult.errors.length > 10 && <p className="text-[10px] text-warm-gray-400">... aur {importResult.errors.length - 10} errors</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-5 border-t flex gap-3">
+              <button onClick={closeImport} className="flex-1 py-3 border rounded-lg text-sm font-medium text-warm-gray-600 hover:bg-warm-gray-50">
+                {importResult && importResult.inserted > 0 ? "Done" : "Cancel"}
+              </button>
+              {!importResult && (
+                <button onClick={doImport} disabled={!importRows.length || importing}
+                  className={`flex-1 py-3.5 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${!importRows.length || importing ? "bg-warm-gray-200 text-warm-gray-400 cursor-not-allowed" : "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95"}`}>
+                  {importing ? "⏳ Importing..." : <><Upload size={16}/> Import {importRows.filter((r) => r.ok).length > 0 ? `(${importRows.filter((r) => r.ok).length} products)` : ""}</>}
+                </button>
+              )}
             </div>
           </div>
         </div>
