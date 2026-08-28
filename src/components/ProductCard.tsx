@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Star, ShoppingBag, Eye, Heart } from "lucide-react";
@@ -23,6 +24,7 @@ interface Props {
 
 export default function ProductCard({ product }: Props) {
   const { addItem } = useCartStore();
+  const [imgFailed, setImgFailed] = useState(false);
 
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -46,16 +48,23 @@ export default function ProductCard({ product }: Props) {
   return (
     <Link href={`/product/${product.slug}`} className="group block">
       <div className="bg-white rounded-xl border border-warm-gray-100 overflow-hidden hover:shadow-xl hover:border-warm-gray-200 transition-all duration-300 hover:-translate-y-1">
-        {/* Image */}
+        {/* Image — agar import ki gayi image load na ho (kharab URL/host) to
+            clean placeholder dikhayein, blank/broken box nahi */}
         <div className="relative aspect-[3/4] bg-warm-gray-50 overflow-hidden">
-          {product.images[0] && (
+          {product.images[0] && !imgFailed ? (
             <Image
               src={product.images[0]}
               alt={product.name}
               fill
               className="object-cover group-hover:scale-105 transition-transform duration-700"
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              onError={() => setImgFailed(true)}
             />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-warm-gray-300">
+              <ShoppingBag size={30} />
+              <span className="text-[9px] mt-1.5 tracking-[0.2em] uppercase">Momis Wardrobe</span>
+            </div>
           )}
 
           {/* Badges */}

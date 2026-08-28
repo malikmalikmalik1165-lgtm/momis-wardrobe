@@ -31,6 +31,8 @@ export interface MappedImportRow {
   reason: string;
   imageCount: number;
   payload: ProductImportPayload;
+  /** Row manually completed via the ✏️ Fill form in the import preview. */
+  filled?: boolean;
 }
 
 export interface ParseResult {
@@ -97,7 +99,7 @@ function buildHeaderFieldMap(headers: string[]): Map<string, string> {
 }
 
 /** Extract a numeric price from messy cells: "Rs. 1,750.00", "1 750", "PKR 2200". */
-function cleanPrice(v: unknown): string {
+export function cleanPrice(v: unknown): string {
   const raw = String(v ?? "").trim();
   if (!raw) return "";
   const m = raw.match(/(\d[\d,\s]*(?:\.\d+)?)/);
@@ -136,12 +138,19 @@ function stripHtml(s: string): string {
   return t.trim().slice(0, 3000);
 }
 
-/** Pull image URLs (or bare image filenames) out of a Woo/Momis cell. */
+/**
+ * Pull image URLs (or bare image filenames) out of a Woo/Momis cell.
+ * Handles comma/space/semicolon-separated URLs, <img> HTML tags, and
+ * normalizes http:// to https:// (next/image only optimizes https hosts).
+ */
 function extractImages(v: unknown): string[] {
-  const raw = String(v ?? "").trim();
+  let raw = String(v ?? "").trim();
   if (!raw) return [];
+  // Semicolons are used as URL separators in some exports — split on them
+  // BEFORE matching so "url1;url2" doesn't become one giant token.
+  raw = raw.replace(/;/g, " ");
   const urls = raw.match(/https?:\/\/[^\s,"'[\]]+/gi) ?? [];
-  const found = urls.map((u) => u.trim().replace(/[,;)]+$/, ""));
+  const found = urls.map((u) => u.trim().replace(/[,)]+$/, "").replace(/^http:\/\//i, "https://"));
   if (found.length > 0) return [...new Set(found)];
   // No absolute URLs — keep bare tokens that look like image filenames
   // (e.g. relative paths or media-library filenames).
@@ -167,6 +176,25 @@ function splitList(s: string): string[] {
 function asList(s: string): string {
   const items = splitList(s);
   return items.length > 0 ? [...new Set(items)].join(", ") : "";
+}
+
+/**
+ * Re-validate a row after the user completed it in the ✏️ Fill form.
+ * Manual fills OVERRIDE soft skips (unpublished/draft, duplicate SKU) —
+ * if the user deliberately filled the row, only a truly missing/invalid
+ * Name or Price can still block it.
+ */
+export function validateFilledPayload(p: ProductImportPayload): {
+  ok: boolean;
+  reason: string;
+  imageCount: number;
+} {
+  const name = (p.name || "").trim();
+  const price = cleanPrice(p.price);
+  const imageCount = extractImages(p.images).length;
+  if (!name) return { ok: false, reason: "Name missing", imageCount };
+  if (!price) return { ok: false, reason: "Price missing", imageCount };
+  return { ok: true, reason: "", imageCount };
 }
 
 function detectFormat(headers: string[]): ImportFormat {
@@ -307,6 +335,12 @@ export function parseProductRows(rows: Record<string, unknown>[]): ParseResult {
   if (skippedUnpub > 0) notes.push(`${skippedUnpub} unpublished/draft rows preview mein marked hain (import nahi hongi)`);
   const noImages = mapped.filter((m) => m.ok && m.imageCount === 0).length;
   if (noImages > 0) notes.push(`⚠️ ${noImages} products mein koi image URL nahi mila`);
+  const needsFill = mapped.filter((m) => !m.ok || m.imageCount === 0).length;
+  if (needsFill > 0) {
+    notes.push(
+      `💡 ${needsFill} rows ko dhyan se dekhein — un par ✏️ Fill button dabayen aur missing fields (Name, Price, Images...) khud bhar lein. Fill ki hui rows skip nahi hongi.`
+    );
+  }
 
   return { format, mapped, notes };
 }

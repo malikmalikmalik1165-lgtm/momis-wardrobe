@@ -66,6 +66,18 @@ interface Props {
 export default function ProductDetail({ product, related }: Props) {
   const { addItem } = useCartStore();
   const [selectedImage, setSelectedImage] = useState(0);
+  // Import ki hui images mein kharab URL/host ho to blank gallery nahi —
+  // index -> failed map se placeholder dikhaya jata hai.
+  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
+  const selectedImageFailed = !!failedImages[selectedImage];
+  // Image kharab nikle to mark karein; selected wali ho to aglay chalti hui par auto-move
+  const onImageError = (i: number) => {
+    setFailedImages((m) => ({ ...m, [i]: true }));
+    if (i === selectedImage) {
+      const next = product.images.findIndex((_, idx) => idx !== i && !failedImages[idx]);
+      if (next !== -1) setSelectedImage(next);
+    }
+  };
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState(
     product.colors[0] || ""
@@ -171,7 +183,7 @@ export default function ProductDetail({ product, related }: Props) {
           {/* Image Gallery */}
           <div className="space-y-4">
             <div className="relative aspect-[3/4] bg-warm-gray-50 rounded-2xl overflow-hidden">
-              {product.images[selectedImage] && (
+              {product.images[selectedImage] && !selectedImageFailed ? (
                 <Image
                   src={product.images[selectedImage]}
                   alt={product.name}
@@ -179,7 +191,13 @@ export default function ProductDetail({ product, related }: Props) {
                   className="object-cover"
                   sizes="(max-width: 1024px) 100vw, 50vw"
                   priority
+                  onError={() => onImageError(selectedImage)}
                 />
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-warm-gray-300">
+                  <ShoppingBag size={44} />
+                  <span className="text-[10px] mt-2 tracking-[0.2em] uppercase">Momis Wardrobe</span>
+                </div>
               )}
               {product.badge && (
                 <span
@@ -212,13 +230,20 @@ export default function ProductDetail({ product, related }: Props) {
                         : "border-transparent hover:border-warm-gray-300"
                     }`}
                   >
-                    <Image
-                      src={img}
-                      alt={`${product.name} view ${i + 1}`}
-                      fill
-                      className="object-cover"
-                      sizes="80px"
-                    />
+                    {failedImages[i] ? (
+                      <div className="absolute inset-0 flex items-center justify-center text-warm-gray-300 bg-warm-gray-50">
+                        <ShoppingBag size={16} />
+                      </div>
+                    ) : (
+                      <Image
+                        src={img}
+                        alt={`${product.name} view ${i + 1}`}
+                        fill
+                        className="object-cover"
+                        sizes="80px"
+                        onError={() => onImageError(i)}
+                      />
+                    )}
                   </button>
                 ))}
               </div>

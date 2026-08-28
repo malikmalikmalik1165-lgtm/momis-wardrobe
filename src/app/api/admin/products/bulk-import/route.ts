@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { products, categories } from "@/db/schema";
 import { sql, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
+import { cleanPrice } from "@/lib/excel-import";
 
 function generateSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
@@ -35,6 +36,27 @@ function splitList(v: unknown): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+/** next/image sirf https hosts optimize karti hai — http URLs ko https banao. */
+function normalizeImageUrl(u: string): string {
+  return u.trim().replace(/^http:\/\//i, "https://");
+}
+
+/**
+ * Image cells comma, semicolon, newlines ya spaces se separated ho sakti hain
+ * (Fill form mein user nayi line se alag karta hai). Har token trim + https
+ * normalize + dedupe. (Sizes/Colors ke liye NAHI use karna — "Free Size"
+ * jaise values spaces ke saath chalti hain, is liye unka splitList comma-only hai.)
+ */
+function splitImages(v: unknown): string[] {
+  if (!v) return [];
+  const out: string[] = [];
+  for (const token of String(v).split(/[\s,;]+/)) {
+    const url = normalizeImageUrl(token);
+    if (url) out.push(url);
+  }
+  return [...new Set(out)];
 }
 
 export async function POST(request: NextRequest) {
@@ -72,12 +94,19 @@ export async function POST(request: NextRequest) {
     let skipped = 0;
     const errors: string[] = [];
 
+    // In-file duplicate tracking (real ids, no sentinels):
+    // - SKU rows: same SKU twice in one file -> later row updates the earlier one
+    //   (yeh wahi raasta hai jab user ne preview mein duplicate row Fill ki ho)
+    // - No-SKU rows: same name twice in one file -> later row is skipped
+    const inFileSkuId = new Map<string, number>();
+    const inFileName = new Set<string>();
+
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowNum = i + 2; // +2 because row 1 is the header in Excel
 
       const name = row.name?.toString().trim();
-      const price = row.price?.toString().trim();
+      const price = cleanPrice(row.price);
 
       if (!name || !price) {
         skipped++;
@@ -115,16 +144,15 @@ export async function POST(request: NextRequest) {
       }
 
       const rowSku = row.sku?.toString().trim() || "";
-      const existingId = rowSku
-        ? productBySku.get(rowSku.toLowerCase())
-        : productByName.get(name.toLowerCase());
+      const skuKey = rowSku ? rowSku.toLowerCase() : "";
+      const nameKey = name.toLowerCase();
 
       const values = {
         description: row.description?.toString().trim() || name,
         price: price,
-        compareAtPrice: row.comparePrice ? row.comparePrice.toString().trim() : null,
+        compareAtPrice: cleanPrice(row.comparePrice) || null,
         categoryId,
-        images: splitList(row.images),
+        images: splitImages(row.images),
         sizes: splitList(row.sizes),
         colors: splitList(row.colors),
         badge: row.badge?.toString().trim() || null,
@@ -133,26 +161,49 @@ export async function POST(request: NextRequest) {
       };
 
       try {
-        if (rowSku && existingId !== undefined) {
+        // 1) In-file duplicate? (before touching the store lookup)
+        if (skuKey) {
+          const inFileId = inFileSkuId.get(skuKey);
+          if (inFileId !== undefined) {
+            // Same SKU dobara isi file mein — later row earlier walay ko update karti hai
+            await db.update(products).set(values).where(eq(products.id, inFileId));
+            updated++;
+            continue;
+          }
+        } else if (inFileName.has(nameKey)) {
+          skipped++;
+          errors.push(`Row ${rowNum}: "${name}" file mein dobara aayi — pehli row import hui, ye row skip ki gayi`);
+          continue;
+        }
+
+        // 2) Already in store?
+        const existingId = skuKey ? productBySku.get(skuKey) : productByName.get(nameKey);
+        if (existingId !== undefined) {
+          if (!skuKey) {
+            skipped++;
+            errors.push(`Row ${rowNum}: "${name}" pehle se maujood hai — update ke liye file mein SKU column bhar kar dobara import karein`);
+            continue;
+          }
           // Same SKU already in store -> update instead of inserting a duplicate
           await db.update(products).set(values).where(eq(products.id, existingId));
           updated++;
+          inFileSkuId.set(skuKey, existingId);
           continue;
         }
-        if (!rowSku && existingId !== undefined) {
-          skipped++;
-          errors.push(`Row ${rowNum}: "${name}" pehle se maujood hai — update ke liye file mein SKU column bhar kar dobara import karein`);
-          continue;
-        }
-        await db.insert(products).values({
-          sku: rowSku || `MW-${String(skuCounter).padStart(4, "0")}`,
-          name,
-          slug: generateSlug(name),
-          ...values,
-        });
+
+        // 3) Fresh insert
+        const [newProd] = await db
+          .insert(products)
+          .values({
+            sku: rowSku || `MW-${String(skuCounter).padStart(4, "0")}`,
+            name,
+            slug: generateSlug(name),
+            ...values,
+          })
+          .returning({ id: products.id });
         if (!rowSku) skuCounter++;
-        if (rowSku) productBySku.set(rowSku.toLowerCase(), -1); // in-file duplicate guard
-        else productByName.set(name.toLowerCase(), -1);
+        if (skuKey) inFileSkuId.set(skuKey, newProd.id);
+        else inFileName.add(nameKey);
         inserted++;
       } catch (e) {
         skipped++;

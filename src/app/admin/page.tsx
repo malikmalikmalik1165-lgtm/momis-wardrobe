@@ -11,7 +11,14 @@ import {
 } from "lucide-react";
 import { formatPrice } from "@/lib/currency";
 import { printInvoice } from "@/components/InvoiceView";
-import { readProductFile, type MappedImportRow, type ImportFormat } from "@/lib/excel-import";
+import {
+  readProductFile,
+  validateFilledPayload,
+  cleanPrice,
+  type MappedImportRow,
+  type ImportFormat,
+  type ProductImportPayload,
+} from "@/lib/excel-import";
 
 interface Product { id: number; sku: string | null; name: string; slug: string; description: string; price: string; compareAtPrice: string | null; categoryId: number | null; images: string[]; sizes: string[]; colors: string[]; inStock: boolean; featured: boolean; badge: string | null; }
 interface Category { id: number; name: string; slug: string; description: string | null; image: string | null; }
@@ -52,6 +59,9 @@ export default function AdminPage() {
   const [importNotes, setImportNotes] = useState<string[]>([]);
   const [importResult, setImportResult] = useState<{ inserted: number; updated: number; skipped: number; errors: string[] } | null>(null);
   const [importDrag, setImportDrag] = useState(false);
+  const [fillIndex, setFillIndex] = useState<number | null>(null);
+  const [fillForm, setFillForm] = useState<ProductImportPayload | null>(null);
+  const [onlyIssues, setOnlyIssues] = useState(false);
 
   // Notification
   const [nf, setNf] = useState({ title: "", body: "", url: "" });
@@ -215,6 +225,9 @@ export default function AdminPage() {
     setImportNotes([]);
     setImportResult(null);
     setImportDrag(false);
+    setFillIndex(null);
+    setFillForm(null);
+    setOnlyIssues(false);
   };
 
   const handleImportFile = async (file: File | null | undefined) => {
@@ -224,6 +237,9 @@ export default function AdminPage() {
     setImportFormat(null);
     setImportNotes([]);
     setImportResult(null);
+    setFillIndex(null);
+    setFillForm(null);
+    setOnlyIssues(false);
     try {
       const result = await readProductFile(file);
       setImportFile(file);
@@ -239,6 +255,14 @@ export default function AdminPage() {
   const doImport = async () => {
     const validRows = importRows.filter((r) => r.ok);
     if (!validRows.length || importing) return;
+    const incomplete = importRows.length - validRows.length;
+    if (
+      incomplete > 0 &&
+      !window.confirm(
+        `⚠️ ${incomplete} rows adhoori hain — un par ✏️ Fill dabayen aur fields complete karein, warna ye skip ho jayengi.\n\nPhir bhi sirf ${validRows.length} poori rows import karein?`
+      )
+    )
+      return;
     setImporting(true);
     setImportResult(null);
     try {
@@ -260,6 +284,59 @@ export default function AdminPage() {
       setImporting(false);
     }
   };
+
+  // ===== Fill form (row ko manually complete karna) =====
+  // Row "attention chahiye" agar skip ho rahi hai YA us ki koi image nahi mili
+  const needsFill = (r: MappedImportRow) => !r.ok || r.imageCount === 0;
+  const issueCount = importRows.filter(needsFill).length;
+  const visibleRows = (onlyIssues ? importRows.map((r, i) => ({ r, i })).filter(({ r }) => needsFill(r)) : importRows.map((r, i) => ({ r, i })));
+
+  const openFill = (i: number) => {
+    const r = importRows[i];
+    if (!r) return;
+    setFillIndex(i);
+    setFillForm({ ...r.payload });
+  };
+
+  const closeFill = () => {
+    setFillIndex(null);
+    setFillForm(null);
+  };
+
+  const setFillField =
+    (k: keyof ProductImportPayload) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+      setFillForm((f) => (f ? { ...f, [k]: e.target.value } : f));
+
+  const saveFill = () => {
+    if (fillIndex === null || !fillForm) return;
+    const name = fillForm.name.trim();
+    const price = cleanPrice(fillForm.price);
+    if (!name || !price) return; // form mein red hints already visible hain
+    const v = validateFilledPayload({ ...fillForm, name, price });
+    setImportRows((rows) =>
+      rows.map((r, i) =>
+        i === fillIndex
+          ? {
+              ...r,
+              name,
+              price,
+              payload: { ...fillForm, name, price },
+              ok: v.ok,
+              reason: v.reason,
+              imageCount: v.imageCount,
+              filled: true,
+            }
+          : r
+      )
+    );
+    closeFill();
+  };
+
+  const fillInputCls = (invalid: boolean) =>
+    `w-full mt-0.5 text-xs border rounded-lg px-2.5 py-2 outline-none transition-colors ${
+      invalid ? "border-rose-400 bg-rose-50/50 focus:border-rose-500" : "border-warm-gray-200 bg-white focus:border-emerald-400"
+    }`;
 
   const downloadImportTemplate = () => {
     const ws = XLSX.utils.aoa_to_sheet([
@@ -1128,10 +1205,135 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
                     {importRows.some((r) => !r.ok) && (
                       <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-semibold">⚠️ {importRows.filter((r) => !r.ok).length} skip hongi</span>
                     )}
+                    {issueCount > 0 && (
+                      <button
+                        onClick={() => setOnlyIssues((v) => !v)}
+                        className={`text-[10px] px-2 py-1 rounded-full font-bold transition-colors ${
+                          onlyIssues
+                            ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                            : "bg-rose-100 text-rose-700 hover:bg-rose-200"
+                        }`}
+                      >
+                        ✏️ Sirf {issueCount} fill-baqi rows {onlyIssues ? "— band karein ×" : "dikhayen"}
+                      </button>
+                    )}
                   </div>
-                  <div className="border rounded-lg overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead className="bg-warm-gray-50 text-[9px] uppercase text-warm-gray-400">
+
+                  {/* Fill form — selected row ko manually complete karein */}
+                  {fillIndex !== null && fillForm && (
+                    <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-4 mb-3">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs font-bold text-emerald-800">
+                          ✏️ Row {fillIndex + 2} — {fillForm.name || "fields bharayen"}
+                        </p>
+                        <button onClick={closeFill} className="text-[10px] text-warm-gray-400 hover:text-rose-500 font-semibold">
+                          ✕ Band karein
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                        <label className="block">
+                          <span className="text-[10px] font-bold text-warm-gray-600">Name *</span>
+                          <input
+                            value={fillForm.name}
+                            onChange={setFillField("name")}
+                            placeholder="Product ka naam"
+                            className={fillInputCls(!fillForm.name.trim())}
+                          />
+                          {!fillForm.name.trim() && <span className="text-[9px] text-rose-500 font-semibold">Name zaroori hai</span>}
+                        </label>
+                        <label className="block">
+                          <span className="text-[10px] font-bold text-warm-gray-600">Price * (PKR)</span>
+                          <input
+                            value={fillForm.price}
+                            onChange={setFillField("price")}
+                            placeholder="e.g. 1750"
+                            inputMode="decimal"
+                            className={fillInputCls(!cleanPrice(fillForm.price))}
+                          />
+                          {!cleanPrice(fillForm.price) && (
+                            <span className="text-[9px] text-rose-500 font-semibold">sirf numbers likhein (e.g. 1750) — free ya Rs. bilkul mat likhein</span>
+                          )}
+                        </label>
+                        <label className="block">
+                          <span className="text-[10px] font-bold text-warm-gray-600">ComparePrice</span>
+                          <input value={fillForm.comparePrice} onChange={setFillField("comparePrice")} placeholder="strikethrough price (optional)" className={fillInputCls(false)} />
+                        </label>
+                        <label className="block">
+                          <span className="text-[10px] font-bold text-warm-gray-600">Category</span>
+                          <input value={fillForm.category} onChange={setFillField("category")} placeholder="Suits, Lawn, Kurti..." className={fillInputCls(false)} />
+                        </label>
+                        <label className="block">
+                          <span className="text-[10px] font-bold text-warm-gray-600">Sizes (comma se alag)</span>
+                          <input value={fillForm.sizes} onChange={setFillField("sizes")} placeholder="S, M, L, XL" className={fillInputCls(false)} />
+                        </label>
+                        <label className="block">
+                          <span className="text-[10px] font-bold text-warm-gray-600">Colors (comma se alag)</span>
+                          <input value={fillForm.colors} onChange={setFillField("colors")} placeholder="Black, Maroon" className={fillInputCls(false)} />
+                        </label>
+                        <label className="block">
+                          <span className="text-[10px] font-bold text-warm-gray-600">Badge</span>
+                          <input value={fillForm.badge} onChange={setFillField("badge")} placeholder="New / Sale / Best Seller" className={fillInputCls(false)} />
+                        </label>
+                        <label className="block">
+                          <span className="text-[10px] font-bold text-warm-gray-600">SKU</span>
+                          <input value={fillForm.sku} onChange={setFillField("sku")} placeholder="khali chhor dein to auto banega" className={fillInputCls(false)} />
+                        </label>
+                        <label className="block">
+                          <span className="text-[10px] font-bold text-warm-gray-600">Featured</span>
+                          <select value={fillForm.featured || ""} onChange={setFillField("featured")} className={fillInputCls(false)}>
+                            <option value="">No</option>
+                            <option value="Yes">Yes</option>
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="text-[10px] font-bold text-warm-gray-600">In Stock</span>
+                          <select value={fillForm.inStock || "Yes"} onChange={setFillField("inStock")} className={fillInputCls(false)}>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                          </select>
+                        </label>
+                        <label className="block col-span-2">
+                          <span className="text-[10px] font-bold text-warm-gray-600">Images — URLs (comma ya nayi line se alag)</span>
+                          <textarea
+                            rows={2}
+                            value={fillForm.images}
+                            onChange={setFillField("images")}
+                            placeholder={"https://example.com/photo1.jpg\nhttps://example.com/photo2.jpg"}
+                            className={`w-full mt-0.5 text-xs border rounded-lg px-2.5 py-2 outline-none font-mono transition-colors ${
+                              fillForm.images ? "border-warm-gray-200 bg-white focus:border-emerald-400" : "border-rose-400 bg-rose-50/50 focus:border-rose-500"
+                            }`}
+                          />
+                          <span className={`text-[9px] font-semibold ${validateFilledPayload(fillForm).imageCount > 0 ? "text-emerald-600" : "text-rose-500"}`}>
+                            {validateFilledPayload(fillForm).imageCount} images mil rahi hain — sab https:// URLs honi chahiye, warna website par show nahi hongi
+                          </span>
+                        </label>
+                        <label className="block col-span-2">
+                          <span className="text-[10px] font-bold text-warm-gray-600">Description</span>
+                          <textarea rows={2} value={fillForm.description} onChange={setFillField("description")} placeholder="Product ke details" className={fillInputCls(false)} />
+                        </label>
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={saveFill}
+                          disabled={!fillForm.name.trim() || !cleanPrice(fillForm.price)}
+                          className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                            fillForm.name.trim() && cleanPrice(fillForm.price)
+                              ? "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95"
+                              : "bg-warm-gray-200 text-warm-gray-400 cursor-not-allowed"
+                          }`}
+                        >
+                          💾 Save — row import mein shamil
+                        </button>
+                        <button onClick={closeFill} className="px-4 py-2.5 border border-warm-gray-200 rounded-lg text-xs text-warm-gray-500 hover:bg-warm-gray-50">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="border rounded-lg max-h-80 overflow-auto">
+                    <table className="w-full text-left min-w-[600px]">
+                      <thead className="bg-warm-gray-50 text-[9px] uppercase text-warm-gray-400 sticky top-0 z-10">
                         <tr>
                           <th className="px-2 py-2">Row</th>
                           <th className="px-2 py-2">Name</th>
@@ -1140,25 +1342,51 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
                           <th className="px-2 py-2 text-right">Images</th>
                           <th className="px-2 py-2">SKU</th>
                           <th className="px-2 py-2">Status</th>
+                          <th className="px-2 py-2 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-warm-gray-50">
-                        {importRows.slice(0, 8).map((r, i) => (
-                          <tr key={i} className={!r.ok ? "bg-amber-50/60" : ""}>
-                            <td className="px-2 py-1.5 text-[10px] font-mono text-warm-gray-400">{i + 2}</td>
+                        {visibleRows.map(({ r, i }) => (
+                          <tr
+                            key={i}
+                            className={
+                              (r.filled ? "bg-green-50/60" : !r.ok ? "bg-amber-50/60" : r.imageCount === 0 ? "bg-rose-50/60" : "") +
+                              (fillIndex === i ? " outline outline-1 -outline-offset-1 outline-emerald-400" : "")
+                            }
+                          >
+                            <td className="px-2 py-1.5 text-[10px] font-mono text-warm-gray-400">
+                              {i + 2}
+                              {r.filled && <span title="Ye row Fill form se complete ki gayi" className="ml-1">✏️</span>}
+                            </td>
                             <td className="px-2 py-1.5 text-[11px] font-medium max-w-[160px] truncate">{r.name || "—"}</td>
                             <td className="px-2 py-1.5 text-[11px]">{r.price || "—"}{r.payload.comparePrice && <span className="text-[9px] text-warm-gray-400 line-through ml-1">{r.payload.comparePrice}</span>}</td>
                             <td className="px-2 py-1.5 text-[11px] text-warm-gray-500">{r.payload.category || "—"}</td>
                             <td className="px-2 py-1.5 text-[10px] text-right"><span className={r.imageCount > 0 ? "text-emerald-600 font-semibold" : "text-rose-500"}>{r.imageCount}</span></td>
                             <td className="px-2 py-1.5 text-[10px] font-mono text-warm-gray-500">{r.payload.sku || "auto"}</td>
-                            <td className={`px-2 py-1.5 text-[10px] font-semibold ${r.ok ? "text-green-600" : "text-amber-600"}`}>{r.ok ? "✅ OK" : `⚠️ ${r.reason}`}</td>
+                            <td className={`px-2 py-1.5 text-[10px] font-semibold whitespace-nowrap ${r.ok ? "text-green-600" : "text-amber-600"}`}>{r.ok ? (r.filled ? "✅ Fill ki" : "✅ OK") : `⚠️ ${r.reason}`}</td>
+                            <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => openFill(i)}
+                                className={
+                                  r.ok && r.imageCount > 0
+                                    ? "text-[10px] px-2 py-1 rounded-md text-warm-gray-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                    : "text-[10px] font-bold px-2 py-1 rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+                                }
+                              >
+                                {r.ok && r.imageCount > 0 ? "✏️ Edit" : "✏️ Fill"}
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    {importRows.length > 8 && <p className="text-[10px] text-warm-gray-400 px-2 py-1.5 bg-warm-gray-50">... aur {importRows.length - 8} rows (sab import mein shamil hongi)</p>}
+                    {visibleRows.length === 0 && (
+                      <p className="text-[10px] text-warm-gray-400 px-2 py-3 text-center">Koi fill-baqi row nahi — sab ready hain ✅</p>
+                    )}
                   </div>
-                  <p className="text-[10px] text-warm-gray-400 mt-1.5">💡 SKU wala product pehle se maujood ho to update ho jayega — dobara import karne par duplicate nahi banega.</p>
+                  <p className="text-[10px] text-warm-gray-400 mt-1.5">
+                    💡 Kisi row par <b>✏️ Fill</b> dabayen — missing fields (Name, Price, Images...) yahan se khud bhar sakte hain, to koi row skip nahi hoti. Fill ki hui rows duplicate/unpublished soft-skips par bhi import ho jati hain. SKU wala product pehle se maujood ho to update ho jayega — duplicate nahi banega.
+                  </p>
                 </div>
               )}
 
