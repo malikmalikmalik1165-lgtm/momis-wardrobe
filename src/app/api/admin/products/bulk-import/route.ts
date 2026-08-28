@@ -51,11 +51,24 @@ export async function POST(request: NextRequest) {
     const categoryMap = new Map<string, number>();
     for (const c of existingCategories) categoryMap.set(c.name.trim().toLowerCase(), c.id);
 
+    // Load existing products once — enables SKU-based update (re-import safe)
+    // and duplicate-name detection.
+    const existingProducts = await db
+      .select({ id: products.id, sku: products.sku, name: products.name })
+      .from(products);
+    const productBySku = new Map<string, number>();
+    const productByName = new Map<string, number>();
+    for (const p of existingProducts) {
+      if (p.sku) productBySku.set(p.sku.trim().toLowerCase(), p.id);
+      productByName.set(p.name.trim().toLowerCase(), p.id);
+    }
+
     // Starting SKU number (continue from current product count)
     const countResult = await db.select({ count: sql<string>`COUNT(*)` }).from(products);
     let skuCounter = parseInt(countResult[0].count) + 1;
 
     let inserted = 0;
+    let updated = 0;
     let skipped = 0;
     const errors: string[] = [];
 
@@ -101,23 +114,45 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      const rowSku = row.sku?.toString().trim() || "";
+      const existingId = rowSku
+        ? productBySku.get(rowSku.toLowerCase())
+        : productByName.get(name.toLowerCase());
+
+      const values = {
+        description: row.description?.toString().trim() || name,
+        price: price,
+        compareAtPrice: row.comparePrice ? row.comparePrice.toString().trim() : null,
+        categoryId,
+        images: splitList(row.images),
+        sizes: splitList(row.sizes),
+        colors: splitList(row.colors),
+        badge: row.badge?.toString().trim() || null,
+        featured: toBool(row.featured, false),
+        inStock: toBool(row.inStock, true),
+      };
+
       try {
+        if (rowSku && existingId !== undefined) {
+          // Same SKU already in store -> update instead of inserting a duplicate
+          await db.update(products).set(values).where(eq(products.id, existingId));
+          updated++;
+          continue;
+        }
+        if (!rowSku && existingId !== undefined) {
+          skipped++;
+          errors.push(`Row ${rowNum}: "${name}" pehle se maujood hai — update ke liye file mein SKU column bhar kar dobara import karein`);
+          continue;
+        }
         await db.insert(products).values({
-          sku: row.sku?.toString().trim() || `MW-${String(skuCounter).padStart(4, "0")}`,
+          sku: rowSku || `MW-${String(skuCounter).padStart(4, "0")}`,
           name,
           slug: generateSlug(name),
-          description: row.description?.toString().trim() || name,
-          price: price,
-          compareAtPrice: row.comparePrice ? row.comparePrice.toString().trim() : null,
-          categoryId,
-          images: splitList(row.images),
-          sizes: splitList(row.sizes),
-          colors: splitList(row.colors),
-          badge: row.badge?.toString().trim() || null,
-          featured: toBool(row.featured, false),
-          inStock: toBool(row.inStock, true),
+          ...values,
         });
-        if (!row.sku) skuCounter++;
+        if (!rowSku) skuCounter++;
+        if (rowSku) productBySku.set(rowSku.toLowerCase(), -1); // in-file duplicate guard
+        else productByName.set(name.toLowerCase(), -1);
         inserted++;
       } catch (e) {
         skipped++;
@@ -125,7 +160,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, inserted, skipped, errors }, { status: 201 });
+    return NextResponse.json({ success: true, inserted, updated, skipped, errors }, { status: 201 });
   } catch (error) {
     console.error("Error bulk importing products:", error);
     return NextResponse.json({ error: "Bulk import fail ho gaya" }, { status: 500 });
