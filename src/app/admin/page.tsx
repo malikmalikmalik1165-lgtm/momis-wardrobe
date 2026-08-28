@@ -11,38 +11,10 @@ import {
 } from "lucide-react";
 import { formatPrice } from "@/lib/currency";
 import { printInvoice } from "@/components/InvoiceView";
+import { readProductFile, type MappedImportRow, type ImportFormat } from "@/lib/excel-import";
 
 interface Product { id: number; sku: string | null; name: string; slug: string; description: string; price: string; compareAtPrice: string | null; categoryId: number | null; images: string[]; sizes: string[]; colors: string[]; inStock: boolean; featured: boolean; badge: string | null; }
 interface Category { id: number; name: string; slug: string; description: string | null; image: string | null; }
-
-interface MappedImportRow {
-  name: string;
-  price: string;
-  ok: boolean;
-  reason: string;
-  payload: {
-    name: string; price: string; comparePrice: string; description: string; category: string;
-    sizes: string; colors: string; images: string; badge: string; featured: string; inStock: string; sku: string;
-  };
-}
-
-// Header names Excel mein likhe gaye ho (kisi bhi case/spelling se) -> standard field
-const IMPORT_HEADER_MAP: Record<string, string> = {
-  name: "name", productname: "name",
-  price: "price",
-  compareprice: "comparePrice", compareatprice: "comparePrice",
-  description: "description",
-  category: "category",
-  sizes: "sizes", size: "sizes",
-  colors: "colors", color: "colors",
-  images: "images", image: "images", imageurls: "images",
-  badge: "badge",
-  featured: "featured",
-  instock: "inStock", stock: "inStock",
-  sku: "sku",
-};
-
-const normImportHeader = (h: unknown) => String(h ?? "").trim().toLowerCase().replace(/[^a-z]/g, "");
 
 type Tab = "products" | "categories" | "orders" | "customers" | "team" | "requests" | "discounts" | "notifications" | "settings";
 
@@ -76,7 +48,9 @@ export default function AdminPage() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importRows, setImportRows] = useState<MappedImportRow[]>([]);
   const [importParseErrors, setImportParseErrors] = useState<string[]>([]);
-  const [importResult, setImportResult] = useState<{ inserted: number; skipped: number; errors: string[] } | null>(null);
+  const [importFormat, setImportFormat] = useState<ImportFormat | null>(null);
+  const [importNotes, setImportNotes] = useState<string[]>([]);
+  const [importResult, setImportResult] = useState<{ inserted: number; updated: number; skipped: number; errors: string[] } | null>(null);
   const [importDrag, setImportDrag] = useState(false);
 
   // Notification
@@ -237,6 +211,8 @@ export default function AdminPage() {
     setImportFile(null);
     setImportRows([]);
     setImportParseErrors([]);
+    setImportFormat(null);
+    setImportNotes([]);
     setImportResult(null);
     setImportDrag(false);
   };
@@ -245,82 +221,41 @@ export default function AdminPage() {
     if (!file) return;
     setImportParseErrors([]);
     setImportRows([]);
+    setImportFormat(null);
+    setImportNotes([]);
     setImportResult(null);
     try {
-      let wb: XLSX.WorkBook;
-      if (file.name.toLowerCase().endsWith(".csv")) {
-        wb = XLSX.read(await file.text(), { type: "string" });
-      } else {
-        wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-      }
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-      if (rows.length === 0) {
-        setImportParseErrors(["File mein koi data row nahi mili — pehli row column headers honi chahiye (Download Template use karein)"]);
-        setImportFile(null);
-        return;
-      }
-      const get = (r: Record<string, unknown>, field: string): unknown => {
-        for (const key of Object.keys(r)) {
-          if (IMPORT_HEADER_MAP[normImportHeader(key)] === field) return r[key];
-        }
-        return "";
-      };
-      const str = (v: unknown) => String(v ?? "").trim();
-      const mapped: MappedImportRow[] = rows.map((r) => {
-        const name = str(get(r, "name"));
-        const price = str(get(r, "price"));
-        let reason = "";
-        if (!name) reason = "Name missing";
-        else if (!price) reason = "Price missing";
-        return {
-          name,
-          price,
-          ok: !reason,
-          reason,
-          payload: {
-            name,
-            price,
-            comparePrice: str(get(r, "comparePrice")),
-            description: str(get(r, "description")),
-            category: str(get(r, "category")),
-            sizes: str(get(r, "sizes")),
-            colors: str(get(r, "colors")),
-            images: str(get(r, "images")),
-            badge: str(get(r, "badge")),
-            featured: str(get(r, "featured")),
-            inStock: str(get(r, "inStock")),
-            sku: str(get(r, "sku")),
-          },
-        };
-      });
+      const result = await readProductFile(file);
       setImportFile(file);
-      setImportRows(mapped);
-    } catch {
+      setImportRows(result.mapped);
+      setImportFormat(result.format);
+      setImportNotes(result.notes);
+    } catch (e) {
       setImportFile(null);
-      setImportParseErrors(["File parse nahi ho saki — sahi Excel file select karein (.xlsx, .xls ya .csv)"]);
+      setImportParseErrors([e instanceof Error ? e.message : "File parse nahi ho saki — sahi Excel/CSV file select karein"]);
     }
   };
 
   const doImport = async () => {
-    if (!importRows.length || importing) return;
+    const validRows = importRows.filter((r) => r.ok);
+    if (!validRows.length || importing) return;
     setImporting(true);
     setImportResult(null);
     try {
       const res = await fetch("/api/admin/products/bulk-import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ products: importRows.map((r) => r.payload) }),
+        body: JSON.stringify({ products: validRows.map((r) => r.payload) }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setImportResult({ inserted: data.inserted || 0, skipped: data.skipped || 0, errors: data.errors || [] });
-        if (data.inserted > 0) load();
+        setImportResult({ inserted: data.inserted || 0, updated: data.updated || 0, skipped: data.skipped || 0, errors: data.errors || [] });
+        if (data.inserted > 0 || data.updated > 0) load();
       } else {
-        setImportResult({ inserted: 0, skipped: importRows.length, errors: [data.error || "Import fail ho gaya — server error"] });
+        setImportResult({ inserted: 0, updated: 0, skipped: validRows.length, errors: [data.error || "Import fail ho gaya — server error"] });
       }
     } catch {
-      setImportResult({ inserted: 0, skipped: importRows.length, errors: ["Network error — internet check karein"] });
+      setImportResult({ inserted: 0, updated: 0, skipped: validRows.length, errors: ["Network error — internet check karein"] });
     } finally {
       setImporting(false);
     }
@@ -1135,6 +1070,9 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
                 <p className="text-[10px] text-warm-gray-500 mt-2">
                   * = zaroori columns — bina Name/Price ke row skip ho jayegi. Naya category likhein to category auto-ban jayegi. SKU blank chhor dein to auto (MW-0001) banega. Multiple sizes/colors/images ko <b>comma (,)</b> se alag karein.
                 </p>
+                <p className="text-[10px] text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5 mt-2">
+                  🛒 <b>WooCommerce / Markaz export</b> (CSV ya XLSX) bhi seedha chalega — file ka format khud pehchana jayega. Columns auto-map hote hain: <b>Name</b> → naam, <b>Sale price</b> → live price (regular price compare-at ban jayegi), <b>Images</b> → image URLs, <b>Categories</b> → category, <b>In stock?</b> → stock status, <b>Attribute (Size/Colour)</b> → sizes/colors. Published=0 / hidden rows khud skip ho jayengi.
+                </p>
               </div>
 
               {/* Parse errors */}
@@ -1172,6 +1110,17 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
               {/* Preview */}
               {importRows.length > 0 && (
                 <div>
+                  {importFormat === "woocommerce" && (
+                    <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 mb-3">
+                      <p className="text-[11px] font-bold text-sky-800">🛒 WooCommerce/Markaz export file pehchani gayi</p>
+                      {importNotes.map((n, i) => (<p key={i} className="text-[10px] text-sky-700 mt-0.5">• {n}</p>))}
+                    </div>
+                  )}
+                  {importFormat === "momis" && importNotes.length > 0 && (
+                    <div className="bg-warm-gray-50 border rounded-xl p-3 mb-3">
+                      {importNotes.map((n, i) => (<p key={i} className="text-[10px] text-warm-gray-600 mt-0.5">• {n}</p>))}
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <span className="text-xs font-bold text-warm-gray-700">Preview:</span>
                     <span className="text-[10px] bg-warm-gray-100 px-2 py-1 rounded-full font-semibold">{importRows.length} rows</span>
@@ -1188,6 +1137,7 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
                           <th className="px-2 py-2">Name</th>
                           <th className="px-2 py-2">Price</th>
                           <th className="px-2 py-2">Category</th>
+                          <th className="px-2 py-2 text-right">Images</th>
                           <th className="px-2 py-2">SKU</th>
                           <th className="px-2 py-2">Status</th>
                         </tr>
@@ -1197,8 +1147,9 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
                           <tr key={i} className={!r.ok ? "bg-amber-50/60" : ""}>
                             <td className="px-2 py-1.5 text-[10px] font-mono text-warm-gray-400">{i + 2}</td>
                             <td className="px-2 py-1.5 text-[11px] font-medium max-w-[160px] truncate">{r.name || "—"}</td>
-                            <td className="px-2 py-1.5 text-[11px]">{r.price || "—"}</td>
+                            <td className="px-2 py-1.5 text-[11px]">{r.price || "—"}{r.payload.comparePrice && <span className="text-[9px] text-warm-gray-400 line-through ml-1">{r.payload.comparePrice}</span>}</td>
                             <td className="px-2 py-1.5 text-[11px] text-warm-gray-500">{r.payload.category || "—"}</td>
+                            <td className="px-2 py-1.5 text-[10px] text-right"><span className={r.imageCount > 0 ? "text-emerald-600 font-semibold" : "text-rose-500"}>{r.imageCount}</span></td>
                             <td className="px-2 py-1.5 text-[10px] font-mono text-warm-gray-500">{r.payload.sku || "auto"}</td>
                             <td className={`px-2 py-1.5 text-[10px] font-semibold ${r.ok ? "text-green-600" : "text-amber-600"}`}>{r.ok ? "✅ OK" : `⚠️ ${r.reason}`}</td>
                           </tr>
@@ -1207,14 +1158,17 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
                     </table>
                     {importRows.length > 8 && <p className="text-[10px] text-warm-gray-400 px-2 py-1.5 bg-warm-gray-50">... aur {importRows.length - 8} rows (sab import mein shamil hongi)</p>}
                   </div>
+                  <p className="text-[10px] text-warm-gray-400 mt-1.5">💡 SKU wala product pehle se maujood ho to update ho jayega — dobara import karne par duplicate nahi banega.</p>
                 </div>
               )}
 
               {/* Result */}
               {importResult && (
-                <div className={`rounded-xl p-4 border ${importResult.inserted > 0 ? "bg-green-50 border-green-200" : "bg-rose-50 border-rose-200"}`}>
-                  <p className={`text-sm font-bold mb-1 ${importResult.inserted > 0 ? "text-green-700" : "text-rose-700"}`}>
-                    {importResult.inserted > 0 ? `✅ ${importResult.inserted} products import ho gaye!` : "❌ Koi product add nahi hua"}
+                <div className={`rounded-xl p-4 border ${importResult.inserted + importResult.updated > 0 ? "bg-green-50 border-green-200" : "bg-rose-50 border-rose-200"}`}>
+                  <p className={`text-sm font-bold mb-1 ${importResult.inserted + importResult.updated > 0 ? "text-green-700" : "text-rose-700"}`}>
+                    {importResult.inserted + importResult.updated > 0
+                      ? `✅ ${importResult.inserted} products import ho gaye${importResult.updated > 0 ? ` + ${importResult.updated} update` : ""}!`
+                      : "❌ Koi product add nahi hua"}
                   </p>
                   {importResult.skipped > 0 && <p className="text-xs text-amber-700 mb-1">⚠️ {importResult.skipped} rows skip hui (Name/Price missing ya save error)</p>}
                   {importResult.errors.length > 0 && (
